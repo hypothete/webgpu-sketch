@@ -1,0 +1,10 @@
+{
+  "name": "webgpu-experiment",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "devDependencies": {
+    "typescript": "^4.6.2",
+    "@webgpu/types": "^0.1.13"
+  }
+}
