@@ -2,6 +2,8 @@
 // https://surma.dev/things/webgpu/ 
 // https://austin-eng.com/webgpu-samples/samples/imageBlur
 
+import { mat4, vec3 } from 'gl-matrix';
+
 start();
 
 async function start() {
@@ -27,7 +29,6 @@ async function start() {
     .then(response => response.text());
 
   //// CANVAS SETUP ////
-  
   const presentationFormat = context.getPreferredFormat(adapter);
   let presentationSize: [number, number]  = [0, 0];
 
@@ -54,6 +55,26 @@ async function start() {
   // window.addEventListener('resize', configureCanvasSize);
 
   //// PIPELINE SETUP ////
+  const computeBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'uniform',
+        }
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          format: 'rgba8unorm',
+          access: 'write-only'
+        }
+      }
+    ]
+  });
+
   const computePipeline = device.createComputePipeline({
     compute: {
       module: device.createShaderModule({
@@ -61,6 +82,9 @@ async function start() {
       }),
       entryPoint: "main",
     },
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [computeBindGroupLayout]
+    })
   });
 
   const renderPipeline = device.createRenderPipeline({
@@ -111,16 +135,42 @@ async function start() {
     [imageBitmap.width, imageBitmap.height]
   );
 
+  //// CAMERA SETUP ////
+  const aspect = canvas.width / canvas.height;
+  const projectionMatrix = mat4.create();
+  mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, aspect, 1, 100.0);
+  const viewMatrix = mat4.create();
+  mat4.lookAt(viewMatrix, vec3.fromValues(0, 0, 0), vec3.fromValues(0, 0, 1), vec3.fromValues(0, 1, 0));
+  const modelViewProjectionMatrix = mat4.create();
+  mat4.multiply(modelViewProjectionMatrix, projectionMatrix, viewMatrix);
+
+  const cameraBuffer = device.createBuffer({
+    size: 4 * 16, // 4x4 matrix
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+  });
+
+  const mvpMatrix: Float32Array = modelViewProjectionMatrix as Float32Array;
+  device.queue.writeBuffer(
+    cameraBuffer,
+    0,
+    mvpMatrix.buffer,
+    mvpMatrix.byteOffset,
+    mvpMatrix.byteLength
+  );
+
   //// SHADER BIND GROUPS ////
+
   const computeBindGroup = device.createBindGroup({
-    layout: computePipeline.getBindGroupLayout(0),
+    layout: computeBindGroupLayout,
     entries: [
-      // {
-      //   binding: 0,
-      //   resource: sampler,
-      // },
       {
         binding: 0,
+        resource: {
+          buffer: cameraBuffer,
+        },
+      },
+      {
+        binding: 1,
         resource: canvasTexture.createView(),
       },
     ],

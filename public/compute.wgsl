@@ -1,4 +1,9 @@
-@group(0) @binding(0) var outputTex : texture_storage_2d<rgba8unorm, write>;
+struct Camera {
+  matrix : mat4x4<f32>;
+}
+
+@group(0) @binding(0) var<uniform> camera : Camera;
+@group(0) @binding(1) var outputTex : texture_storage_2d<rgba8unorm, write>;
 
 @stage(compute) @workgroup_size(16, 16, 1)
 fn main(
