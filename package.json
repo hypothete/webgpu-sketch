@@ -1,5 +1,6 @@
 {
-  "name": "webgpu-experiment",
+  "name": "webgpu-sketch",
+  "author": "Duncan Alexander",
   "scripts": {
     "build": "tsc -p .",
     "start:watch": "tsc -w",
