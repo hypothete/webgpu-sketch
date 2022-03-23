@@ -21,6 +21,7 @@ struct Ray {
 
 var<private> NEAR: f32 = 0.1;
 var<private> FAR: f32 = 100.0;
+var<private> TESTLIGHT: vec3<f32> = vec3<f32>(10.0, 10.0, -2.0);
 
 fn intersectSphere(r: Ray, s: Sphere) -> vec2<f32> {
   let oc = r.origin - s.position;
@@ -62,12 +63,15 @@ fn raytrace(r: Ray) -> vec4<f32> {
     i = i + 1u;
   }
 
-  if (intersections.x < FAR) {
-    let hit = rayAt(r, intersections.x);
-    let sNormal = sphereNormal(nearSphere, hit);
-    return vec4<f32>(sNormal, 1.0);
+  if (intersections.x >= FAR) {
+    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
   }
-  return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
+  let hit = rayAt(r, intersections.x);
+  let sNormal = sphereNormal(nearSphere, hit);
+  let lambert = dot(sNormal, TESTLIGHT);
+  return vec4<f32>(lambert, lambert, lambert, 1.0);
+
 }
 
 @stage(compute) @workgroup_size(16, 16, 1)
