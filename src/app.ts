@@ -7,6 +7,7 @@ import { mat4, vec3, vec4 } from 'gl-matrix';
 const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
 const NEAR = 0.01;
 const FAR = 100;
+let timestep = 0;
 
 start();
 
@@ -179,7 +180,7 @@ async function start() {
   );
   const viewMatrix = mat4.create();
   mat4.lookAt(viewMatrix,
-    vec3.fromValues(-3, 3, 3), // position
+    vec3.fromValues(-3, 1, 3), // position
     vec3.fromValues(0, 0, 0),  // target
     vec3.fromValues(0, 1, 0)   // up
   );
@@ -187,14 +188,15 @@ async function start() {
   mat4.multiply(mvpMatrix, projectionMatrix, viewMatrix);
   const mvpArray: Float32Array = mvpMatrix as Float32Array;
   const cameraBuffer = device.createBuffer({
-    size: 5 * vec4Size, // 4x4 matrix and resolution
+    size: 6 * vec4Size, // 4x4 matrix, resolution, near, far, timestep
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     mappedAtCreation: true,
   });
   const cameraArray = new Float32Array(cameraBuffer.getMappedRange());
   cameraArray.set([
     ...mvpArray,
-    canvas.width, canvas.height, NEAR, FAR
+    canvas.width, canvas.height, NEAR, FAR,
+    0
   ]);
   cameraBuffer.unmap();
 
@@ -262,11 +264,14 @@ async function start() {
   requestAnimationFrame(frame);
 
   function frame () {
-    if (!context) throw Error("Lost rendering context!");
-
+    if (!canvas || !context) throw Error("Lost rendering context!");
     const commandEncoder = device.createCommandEncoder();
 
     //// COMPUTE PASS ////
+    // update timestep
+    const tsBuffer = Float32Array.from([timestep]);
+    device.queue.writeBuffer(cameraBuffer, vec4Size * 5, tsBuffer);
+    // start pass
     const computePass = commandEncoder.beginComputePass();
     computePass.setPipeline(computePipeline);
     computePass.setBindGroup(0, computeBindGroup);
@@ -306,6 +311,7 @@ async function start() {
     // );
 
     device.queue.submit([commandEncoder.finish()]);
+    timestep += 1;
     requestAnimationFrame(frame);
   }
 }
