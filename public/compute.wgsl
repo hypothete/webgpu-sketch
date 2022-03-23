@@ -1,8 +1,8 @@
 struct Uniforms {
-  camPosition: vec4<f32>;
-  camDirection: vec4<f32>;
-  camUp: vec4<f32>;
+  mvpMatrix: mat4x4<f32>;
   resolution: vec2<f32>;
+  near: f32;
+  far: f32;
 }
 
 struct Sphere {
@@ -19,8 +19,6 @@ struct Ray {
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var outputTex: texture_storage_2d<rgba8unorm, write>;
 
-var<private> NEAR: f32 = 0.1;
-var<private> FAR: f32 = 100.0;
 var<private> TESTLIGHT: vec3<f32> = vec3<f32>(10.0, 10.0, -2.0);
 
 fn intersectSphere(r: Ray, s: Sphere) -> vec2<f32> {
@@ -46,7 +44,7 @@ fn sphereNormal(s: Sphere, p: vec3<f32>) -> vec3<f32> {
 fn raytrace(r: Ray) -> vec4<f32> {
   var i: u32 = 0u;
   let numSpheres = arrayLength(&spheres);
-  var intersections = vec2<f32>(FAR, NEAR);
+  var intersections = vec2<f32>(uniforms.far, uniforms.near);
   var nearSphere: Sphere;
 
   loop {
@@ -54,7 +52,7 @@ fn raytrace(r: Ray) -> vec4<f32> {
       break;
     }
     let sphereIntersections = intersectSphere(r, spheres[i]);
-    if (sphereIntersections.x > NEAR &&
+    if (sphereIntersections.x > uniforms.near &&
       sphereIntersections.x < sphereIntersections.y &&
       sphereIntersections.x < intersections.x) {
         intersections.x = sphereIntersections.x;
@@ -63,14 +61,15 @@ fn raytrace(r: Ray) -> vec4<f32> {
     i = i + 1u;
   }
 
-  if (intersections.x >= FAR) {
+  if (intersections.x >= uniforms.far) {
     return vec4<f32>(0.0, 0.0, 0.0, 1.0);
   }
 
   let hit = rayAt(r, intersections.x);
   let sNormal = sphereNormal(nearSphere, hit);
-  let lambert = dot(sNormal, TESTLIGHT);
-  return vec4<f32>(lambert, lambert, lambert, 1.0);
+  let camLight = uniforms.mvpMatrix * vec4<f32>(TESTLIGHT, 1.0);
+  let lambert = clamp(dot(sNormal, camLight.rgb), 0.0, 1.0);
+  return vec4<f32>(lambert, 0.0, 0.0, 1.0);
 
 }
 
@@ -84,18 +83,16 @@ fn main(
   let y = f32(global_id.y);
   let lx = f32(local_id.x);
   let ly = f32(local_id.y);
-
-  let aspect: f32 = uniforms.resolution.y / uniforms.resolution.x;
-
+  let aspect = uniforms.resolution.y / uniforms.resolution.x;
   let rayOffset = vec3<f32>(
-    (2.0 * (x / uniforms.resolution.x) - 1.0) / aspect,
+    (1.0 - 2.0 * (x / uniforms.resolution.x)) / aspect,
     (1.0 - 2.0 * (y / uniforms.resolution.y)),
-    0.0
+    1.0
   );
 
   let ray = Ray(
-    vec3<f32>(uniforms.camPosition.xyz),
-    normalize(uniforms.camDirection.xyz + rayOffset)
+    vec3<f32>(0.0),
+    normalize(rayOffset)
   );
 
   let col = raytrace(ray);

@@ -2,9 +2,11 @@
 // https://surma.dev/things/webgpu/ 
 // https://austin-eng.com/webgpu-samples/samples/imageBlur
 
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 
 const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+const NEAR = 0.01;
+const FAR = 100;
 
 start();
 
@@ -169,53 +171,52 @@ async function start() {
   //// CAMERA SETUP ////
   const aspect = canvas.width / canvas.height;
   const projectionMatrix = mat4.create();
-  mat4.perspective(projectionMatrix, (2 * Math.PI) / 5, aspect, 1, 100.0);
+  mat4.perspective(projectionMatrix,
+    (2 * Math.PI) / 5,
+    aspect,
+    NEAR,
+    FAR
+  );
   const viewMatrix = mat4.create();
-  mat4.lookAt(viewMatrix, vec3.fromValues(0, 0, 0), vec3.fromValues(0, 0, 1), vec3.fromValues(0, 1, 0));
-  const modelViewProjectionMatrix = mat4.create();
-  mat4.multiply(modelViewProjectionMatrix, projectionMatrix, viewMatrix);
-
-  // todo rewrite with this mat4
-  // for now going to pass vectors as uniforms
-
-  // const cameraBuffer = device.createBuffer({
-  //   size: 4 * 16, // 4x4 matrix
-  //   usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-  // });
-
-  // const mvpMatrix: Float32Array = modelViewProjectionMatrix as Float32Array;
-  // device.queue.writeBuffer(
-  //   cameraBuffer,
-  //   0,
-  //   mvpMatrix.buffer,
-  //   mvpMatrix.byteOffset,
-  //   mvpMatrix.byteLength
-  // );
-
-  const uniformBuffer = device.createBuffer({
-    size: 4 * vec4Size,
+  mat4.lookAt(viewMatrix,
+    vec3.fromValues(-3, 3, 3), // position
+    vec3.fromValues(0, 0, 0),  // target
+    vec3.fromValues(0, 1, 0)   // up
+  );
+  const mvpMatrix = mat4.create();
+  mat4.multiply(mvpMatrix, projectionMatrix, viewMatrix);
+  const mvpArray: Float32Array = mvpMatrix as Float32Array;
+  const cameraBuffer = device.createBuffer({
+    size: 5 * vec4Size, // 4x4 matrix and resolution
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
     mappedAtCreation: true,
   });
-  const uniformArray = new Float32Array(uniformBuffer.getMappedRange());
-  uniformArray.set([
-    0, 0, -1, 1, // position
-    0, 0,  1, 1, // direction
-    0, 1,  0, 1, // up
-    canvas.width, canvas.height
+  const cameraArray = new Float32Array(cameraBuffer.getMappedRange());
+  cameraArray.set([
+    ...mvpArray,
+    canvas.width, canvas.height, NEAR, FAR
   ]);
-  uniformBuffer.unmap();
+  cameraBuffer.unmap();
 
   //// SPHERE ARRAY ////
+  const spherePositions = [
+    vec4.fromValues(-2, 0, 0, 1),
+    vec4.fromValues(-1, 0, 0, 1),
+    vec4.fromValues(0, 0, 0, 1),
+    vec4.fromValues(2, 0, 0, 1)
+  ];
   const sphereBuffer = device.createBuffer({
-    size: 2 * vec4Size,
+    size: spherePositions.length * vec4Size,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     mappedAtCreation: true
   });
   const sphereArray = new Float32Array(sphereBuffer.getMappedRange());
+  // precompute mvpMatrix positions for spheres
   sphereArray.set([
-    0, 0, 3, 0.5,
-    0, 1, 6, 2.0
+    ...spherePositions.flatMap(spherePos => {
+      vec4.transformMat4(spherePos, spherePos, mvpMatrix);
+      return [...spherePos.slice(0,3), 0.5];
+    })
   ]);
   sphereBuffer.unmap();
 
@@ -227,7 +228,7 @@ async function start() {
       {
         binding: 0,
         resource: {
-          buffer: uniformBuffer,
+          buffer: cameraBuffer,
         },
       },
       {
