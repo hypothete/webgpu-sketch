@@ -4,6 +4,8 @@
 
 import { mat4, vec3 } from 'gl-matrix';
 
+const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+
 start();
 
 async function start() {
@@ -66,6 +68,13 @@ async function start() {
       },
       {
         binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'read-only-storage'
+        }
+      },
+      {
+        binding: 2,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: {
           format: 'rgba8unorm',
@@ -166,19 +175,49 @@ async function start() {
   const modelViewProjectionMatrix = mat4.create();
   mat4.multiply(modelViewProjectionMatrix, projectionMatrix, viewMatrix);
 
-  const cameraBuffer = device.createBuffer({
-    size: 4 * 16, // 4x4 matrix
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-  });
+  // todo rewrite with this mat4
+  // for now going to pass vectors as uniforms
 
-  const mvpMatrix: Float32Array = modelViewProjectionMatrix as Float32Array;
-  device.queue.writeBuffer(
-    cameraBuffer,
-    0,
-    mvpMatrix.buffer,
-    mvpMatrix.byteOffset,
-    mvpMatrix.byteLength
-  );
+  // const cameraBuffer = device.createBuffer({
+  //   size: 4 * 16, // 4x4 matrix
+  //   usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+  // });
+
+  // const mvpMatrix: Float32Array = modelViewProjectionMatrix as Float32Array;
+  // device.queue.writeBuffer(
+  //   cameraBuffer,
+  //   0,
+  //   mvpMatrix.buffer,
+  //   mvpMatrix.byteOffset,
+  //   mvpMatrix.byteLength
+  // );
+
+  const uniformBuffer = device.createBuffer({
+    size: 4 * vec4Size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+    mappedAtCreation: true,
+  });
+  const uniformArray = new Float32Array(uniformBuffer.getMappedRange());
+  uniformArray.set([
+    0, 0, -1, 1, // position
+    0, 0,  1, 1, // direction
+    0, 1,  0, 1, // up
+    canvas.width, canvas.height
+  ]);
+  uniformBuffer.unmap();
+
+  //// SPHERE ARRAY ////
+  const sphereBuffer = device.createBuffer({
+    size: 2 * vec4Size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
+  });
+  const sphereArray = new Float32Array(sphereBuffer.getMappedRange());
+  sphereArray.set([
+    0, 0, 3, 0.5,
+    0, 1, 6, 2.0
+  ]);
+  sphereBuffer.unmap();
 
   //// PIPELINE BIND GROUPS ////
 
@@ -188,11 +227,17 @@ async function start() {
       {
         binding: 0,
         resource: {
-          buffer: cameraBuffer,
+          buffer: uniformBuffer,
         },
       },
       {
         binding: 1,
+        resource: {
+          buffer: sphereBuffer,
+        }
+      },
+      {
+        binding: 2,
         resource: canvasTexture.createView(),
       },
     ],
