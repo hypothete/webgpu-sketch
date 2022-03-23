@@ -54,7 +54,7 @@ async function start() {
   // todo handle resizing
   // window.addEventListener('resize', configureCanvasSize);
 
-  //// PIPELINE SETUP ////
+  //// PIPELINE AND BIND GROUP LAYOUT SETUP ////
   const computeBindGroupLayout = device.createBindGroupLayout({
     entries: [
       {
@@ -87,6 +87,25 @@ async function start() {
     })
   });
 
+  const renderBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.FRAGMENT,
+        sampler: {
+          type: 'filtering'
+        }
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'float'
+        }
+      }
+    ]
+  });
+
   const renderPipeline = device.createRenderPipeline({
     vertex: {
       module: device.createShaderModule({
@@ -108,6 +127,9 @@ async function start() {
     primitive: {
       topology: 'triangle-list',
     },
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [renderBindGroupLayout]
+    })
   });
 
   //// TEXTURE SETUP ////
@@ -158,7 +180,7 @@ async function start() {
     mvpMatrix.byteLength
   );
 
-  //// SHADER BIND GROUPS ////
+  //// PIPELINE BIND GROUPS ////
 
   const computeBindGroup = device.createBindGroup({
     layout: computeBindGroupLayout,
@@ -177,7 +199,7 @@ async function start() {
   });
 
   const renderBindGroup = device.createBindGroup({
-    layout: renderPipeline.getBindGroupLayout(0),
+    layout: renderBindGroupLayout,
     entries: [
       {
         binding: 0,
