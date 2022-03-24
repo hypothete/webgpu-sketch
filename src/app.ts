@@ -114,6 +114,13 @@ async function start() {
         texture: {
           sampleType: 'float'
         }
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: {
+          sampleType: 'float'
+        }
       }
     ]
   });
@@ -150,24 +157,30 @@ async function start() {
     minFilter: 'linear',
   });
 
-  const imageBitmap = await createImageBitmap(canvas);
-
   // todo this usage probably needs work
-  const canvasTexture = device.createTexture({
-    size: [imageBitmap.width, imageBitmap.height, 1],
+  // const imageBitmap = await createImageBitmap(canvas);
+
+  const computeTexture = device.createTexture({
+    size: presentationSize,
     format: 'rgba8unorm',
     usage:
-      GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.STORAGE_BINDING |
-      GPUTextureUsage.COPY_DST |
-      GPUTextureUsage.RENDER_ATTACHMENT,
+    GPUTextureUsage.TEXTURE_BINDING |
+    GPUTextureUsage.STORAGE_BINDING |
+    GPUTextureUsage.COPY_DST |
+    GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  
+  const canvasTexture = device.createTexture({
+    size: presentationSize,
+    format: presentationFormat,
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
   });
 
-  device.queue.copyExternalImageToTexture(
-    { source: imageBitmap },
-    { texture: canvasTexture },
-    [imageBitmap.width, imageBitmap.height]
-  );
+  // device.queue.copyExternalImageToTexture(
+  //   { source: imageBitmap },
+  //   { texture: canvasTexture },
+  //   [imageBitmap.width, imageBitmap.height]
+  // );
 
   //// CAMERA SETUP ////
   const aspect = canvas.width / canvas.height;
@@ -195,7 +208,7 @@ async function start() {
   const cameraArray = new Float32Array(cameraBuffer.getMappedRange());
   cameraArray.set([
     ...mvpArray,
-    canvas.width, canvas.height, NEAR, FAR,
+    ...presentationSize, NEAR, FAR,
     0
   ]);
   cameraBuffer.unmap();
@@ -241,7 +254,7 @@ async function start() {
       },
       {
         binding: 2,
-        resource: canvasTexture.createView(),
+        resource: computeTexture.createView(),
       },
     ],
   });
@@ -255,6 +268,10 @@ async function start() {
       },
       {
         binding: 1,
+        resource: computeTexture.createView(),
+      },
+      {
+        binding: 2,
         resource: canvasTexture.createView(),
       },
     ],
@@ -300,15 +317,15 @@ async function start() {
     renderPass.draw(6, 1, 0, 0);
     renderPass.end();
     // Copy the updated texture back
-    // commandEncoder.copyTextureToTexture(
-    //   {
-    //     texture: swapChainTexture,
-    //   },
-    //   {
-    //     texture: canvasTexture,
-    //   },
-    //   presentationSize
-    // );
+    commandEncoder.copyTextureToTexture(
+      {
+        texture: swapChainTexture,
+      },
+      {
+        texture: canvasTexture,
+      },
+      presentationSize, // [imageBitmap.width, imageBitmap.height, 1]
+    );
 
     device.queue.submit([commandEncoder.finish()]);
     timestep += 1;

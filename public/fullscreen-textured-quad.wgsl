@@ -1,7 +1,8 @@
-// from https://austin-eng.com/webgpu-samples/samples/imageBlur#../../shaders/fullscreenTexturedQuad.wgsl
+// based off https://austin-eng.com/webgpu-samples/samples/imageBlur#../../shaders/fullscreenTexturedQuad.wgsl
 
 @group(0) @binding(0) var mySampler : sampler;
-@group(0) @binding(1) var myTexture : texture_2d<f32>;
+@group(0) @binding(1) var computeTexture : texture_2d<f32>;
+@group(0) @binding(2) var canvasTexture : texture_2d<f32>;
 
 struct VertexOutput {
   @builtin(position) Position : vec4<f32>;
@@ -34,5 +35,7 @@ fn vert_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 
 @stage(fragment)
 fn frag_main(@location(0) fragUV : vec2<f32>) -> @location(0) vec4<f32> {
-  return textureSample(myTexture, mySampler, fragUV);
+  let col1 = textureSample(computeTexture, mySampler, fragUV);
+  let col2 = textureSample(canvasTexture, mySampler, fragUV);
+  return vec4<f32>(mix(col1, col2, 0.95).rgb, 1.0);
 }
