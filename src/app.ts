@@ -157,9 +157,6 @@ async function start() {
     minFilter: 'linear',
   });
 
-  // todo this usage probably needs work
-  // const imageBitmap = await createImageBitmap(canvas);
-
   const computeTexture = device.createTexture({
     size: presentationSize,
     format: 'rgba8unorm',
@@ -176,12 +173,6 @@ async function start() {
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
   });
 
-  // device.queue.copyExternalImageToTexture(
-  //   { source: imageBitmap },
-  //   { texture: canvasTexture },
-  //   [imageBitmap.width, imageBitmap.height]
-  // );
-
   //// CAMERA SETUP ////
   const aspect = canvas.width / canvas.height;
   const projectionMatrix = mat4.create();
@@ -193,7 +184,7 @@ async function start() {
   );
   const viewMatrix = mat4.create();
   mat4.lookAt(viewMatrix,
-    vec3.fromValues(-3, 1, 3), // position
+    vec3.fromValues(0, 0.5, 3), // position
     vec3.fromValues(0, 0, 0),  // target
     vec3.fromValues(0, 1, 0)   // up
   );
@@ -215,10 +206,10 @@ async function start() {
 
   //// SPHERE ARRAY ////
   const spherePositions = [
+    vec4.fromValues(-4, 0, 0, 1),
     vec4.fromValues(-2, 0, 0, 1),
-    vec4.fromValues(-1, 0, 0, 1),
     vec4.fromValues(0, 0, 0, 1),
-    vec4.fromValues(2, 0, 0, 1)
+    vec4.fromValues(3, 0, 0, 1)
   ];
   const sphereBuffer = device.createBuffer({
     size: spherePositions.length * vec4Size,
@@ -324,7 +315,7 @@ async function start() {
       {
         texture: canvasTexture,
       },
-      presentationSize, // [imageBitmap.width, imageBitmap.height, 1]
+      presentationSize,
     );
 
     device.queue.submit([commandEncoder.finish()]);

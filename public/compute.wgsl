@@ -16,11 +16,22 @@ struct Ray {
   direction: vec3<f32>;
 }
 
+struct Info {
+  lengths: vec2<f32>;
+  normal: vec3<f32>;
+}
+
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var outputTex: texture_storage_2d<rgba8unorm, write>;
 
 var<private> TESTLIGHT: vec3<f32> = vec3<f32>(10.0, 10.0, -2.0);
+var<private> UP: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
+var<private> PI: f32 = 3.141592653589;
+var<private> EPSILON: f32 = 0.001;
+var<private> SKYDOWN: vec4<f32> = vec4<f32>(0.3, 0.3, 0.9, 1.0);
+var<private> SKYUP: vec4<f32> = vec4<f32>(0.9, 0.9, 1.0, 1.0);
+
 
 fn rand(co: vec2<f32>) -> f32 {
   return fract(sin(dot(co.xy ,vec2<f32>(12.9898,78.233))) * 43758.5453);
@@ -59,12 +70,14 @@ fn sphereNormal(s: Sphere, p: vec3<f32>) -> vec3<f32> {
   return normalize(p - s.position);
 }
 
-fn raytrace(r: Ray) -> vec4<f32> {
-  var i: u32 = 0u;
-  let numSpheres = arrayLength(&spheres);
-  var intersections = vec2<f32>(uniforms.far, uniforms.near);
-  var nearSphere: Sphere;
+fn getSkyColor(dir: vec3<f32>) -> vec4<f32> {
+  let skyAmt = clamp(dot(dir, UP), 0.0, 1.0);
+  return mix(SKYDOWN, SKYUP, skyAmt);
+}
 
+fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
+  let numSpheres = arrayLength(&spheres);
+  var i: u32 = 0u;
   loop {
     if (i >= numSpheres) {
       break;
@@ -72,24 +85,43 @@ fn raytrace(r: Ray) -> vec4<f32> {
     let sphereIntersections = intersectSphere(r, spheres[i]);
     if (sphereIntersections.x > uniforms.near &&
       sphereIntersections.x < sphereIntersections.y &&
-      sphereIntersections.x < intersections.x) {
-        intersections.x = sphereIntersections.x;
-        nearSphere = spheres[i];
+      sphereIntersections.x < (*info).lengths.x) {
+        (*info).lengths.x = sphereIntersections.x;
+        (*info).normal = sphereNormal(spheres[i], rayAt(r, sphereIntersections.x));
     }
     i = i + 1u;
   }
+}
 
-  if (intersections.x >= uniforms.far) {
-    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
+  var info: Info = Info(
+    vec2<f32>(uniforms.far, uniforms.near),
+    vec3(0.0)
+  );
+  var col = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  let bounces: u32 = 4u;
+  var i: u32 = bounces;
+  loop {
+    if (i < 1u) {
+      break;
+    }
+    intersectSpheres(*r, &info);
+    let hit = rayAt(*r, info.lengths.x);
+    if (info.lengths.x >= uniforms.far) {
+      col = col * getSkyColor((*r).direction);
+      break;
+    }
+    let lambert = info.normal + randomOnUnitSphere(hit.xy - hit.yz);
+    let specular = reflect((*r).direction, info.normal);
+    let albedo = vec4<f32>(0.5, 0.5, 0.5, 1.0);
+    // todo: finish shading once camera movement and lights are in
+    col = col * albedo; // * (ambient + getSkyColor(mix(lambert, specular, 0.9)));
+    // bounce ray
+    (*r).direction = mix(lambert, specular, 0.99);
+    (*r).origin = hit + (*r).direction * EPSILON;
+    i = i - 1u;
   }
-
-  let hit = rayAt(r, intersections.x);
-  let sNormal = sphereNormal(nearSphere, hit);
-  let camLight = uniforms.mvpMatrix * vec4<f32>(TESTLIGHT, 1.0);
-  let lambert = sNormal + randomOnUnitSphere(hit.xy - hit.yz);
-  //let lambert = clamp(dot(sNormal, camLight.rgb), 0.0, 1.0);
-  return vec4<f32>(lambert, 1.0);
-
+  return col;
 }
 
 @stage(compute) @workgroup_size(16, 16, 1)
@@ -115,12 +147,13 @@ fn main(
     1.0
   );
 
-  let ray = Ray(
+  // note: can't get pointers to lets
+  var ray = Ray(
     vec3<f32>(0.0),
     normalize(rayOffset)
   );
 
-  let col = raytrace(ray);
+  let col = raytrace(&ray);
 
   textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col);
 }
