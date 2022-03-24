@@ -25,7 +25,6 @@ struct Info {
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var outputTex: texture_storage_2d<rgba8unorm, write>;
 
-var<private> TESTLIGHT: vec3<f32> = vec3<f32>(10.0, 10.0, -2.0);
 var<private> UP: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
 var<private> PI: f32 = 3.141592653589;
 var<private> EPSILON: f32 = 0.001;
@@ -82,12 +81,17 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
     if (i >= numSpheres) {
       break;
     }
-    let sphereIntersections = intersectSphere(r, spheres[i]);
+    // project sphere into camera space
+    let movedSphere = Sphere(
+      (uniforms.mvpMatrix * vec4<f32>(spheres[i].position, 1.0)).xyz,
+      spheres[i].radius
+    );
+    let sphereIntersections = intersectSphere(r, movedSphere);
     if (sphereIntersections.x > uniforms.near &&
       sphereIntersections.x < sphereIntersections.y &&
       sphereIntersections.x < (*info).lengths.x) {
         (*info).lengths.x = sphereIntersections.x;
-        (*info).normal = sphereNormal(spheres[i], rayAt(r, sphereIntersections.x));
+        (*info).normal = sphereNormal(movedSphere, rayAt(r, sphereIntersections.x));
     }
     i = i + 1u;
   }
@@ -99,7 +103,7 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     vec3(0.0)
   );
   var col = vec4<f32>(1.0, 1.0, 1.0, 1.0);
-  let bounces: u32 = 4u;
+  let bounces: u32 = 3u;
   var i: u32 = bounces;
   loop {
     if (i < 1u) {
@@ -111,11 +115,12 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
       col = col * getSkyColor((*r).direction);
       break;
     }
-    let lambert = info.normal + randomOnUnitSphere(hit.xy - hit.yz);
+    var lambert = info.normal + randomOnUnitSphere(hit.xy - hit.yz);
+    lambert = clamp(lambert, vec3<f32>(0.0), vec3<f32>(1.0));
     let specular = reflect((*r).direction, info.normal);
     let albedo = vec4<f32>(0.5, 0.5, 0.5, 1.0);
     // todo: finish shading once camera movement and lights are in
-    col = col * albedo; // * (ambient + getSkyColor(mix(lambert, specular, 0.9)));
+    col = col * vec4<f32>(lambert, 1.0); // * (ambient + getSkyColor(mix(lambert, specular, 0.9)));
     // bounce ray
     (*r).direction = mix(lambert, specular, 0.99);
     (*r).origin = hit + (*r).direction * EPSILON;
