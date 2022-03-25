@@ -26,7 +26,9 @@ struct Info {
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
-@group(0) @binding(2) var outputTex: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(2) var mySampler : sampler;
+@group(0) @binding(3) var computeTexture : texture_2d<f32>;
+@group(0) @binding(4) var outputTex: texture_storage_2d<rgba16float, write>;
 
 var<private> UP: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
 var<private> PI: f32 = 3.141592653589;
@@ -160,8 +162,12 @@ fn main(
     vec3<f32>(0.0),
     normalize(rayOffset)
   );
-
-  let col = raytrace(&ray);
-
-  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col);
+  let uv = vec2<f32>(
+    floor(x / uniforms.resolution.x),
+    floor(y / uniforms.resolution.y)
+  );
+  let col1 = raytrace(&ray);
+  var col2 = textureSampleLevel(computeTexture, mySampler, uv, 0.0);
+  let col3 = mix(col1, col2, 1.0 - 1.0 / uniforms.timestep);
+  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
 }

@@ -1,9 +1,5 @@
-// based off https://austin-eng.com/webgpu-samples/samples/imageBlur#../../shaders/fullscreenTexturedQuad.wgsl
-
 @group(0) @binding(0) var mySampler : sampler;
 @group(0) @binding(1) var computeTexture : texture_2d<f32>;
-@group(0) @binding(2) var canvasTexture : texture_2d<f32>;
-@group(0) @binding(3) var<uniform> uniforms: Uniform;
 
 struct VertexOutput {
   @builtin(position) Position : vec4<f32>;
@@ -14,7 +10,7 @@ struct Uniform {
   timestep: f32;
 }
 
-var<private> EXPOSURE: f32 = 0.5;
+var<private> EXPOSURE: f32 = 1.0;
 
 fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   let a = 2.51f;
@@ -52,7 +48,6 @@ fn vert_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 @stage(fragment)
 fn frag_main(@location(0) fragUV : vec2<f32>) -> @location(0) vec4<f32> {
   let col1 = textureSample(computeTexture, mySampler, fragUV).rgb;
-  let col2 = textureSample(canvasTexture, mySampler, fragUV).rgb;
-  let col3 = mix(col1, col2, 1.0 - 1.0/uniforms.timestep);
-  return vec4<f32>(col3, 1.0);
+  return vec4<f32>(ACESFilm(col1 * EXPOSURE), 1.0);
+  // return vec4<f32>(col1, 1.0);
 }

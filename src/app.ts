@@ -1,8 +1,4 @@
-// based on code from these sources:
-// https://surma.dev/things/webgpu/ 
-// https://austin-eng.com/webgpu-samples/samples/imageBlur
-
-import { mat4, vec3, vec4 } from 'gl-matrix';
+import { mat4, vec3 } from 'gl-matrix';
 import Camera from './camera';
 import Sphere, {spheres} from './spheres';
 
@@ -80,8 +76,22 @@ async function start() {
       {
         binding: 2,
         visibility: GPUShaderStage.COMPUTE,
+        sampler: {
+          type: 'filtering'
+        }
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float'
+        }
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
         storageTexture: {
-          format: 'rgba8unorm',
+          format: 'rgba16float',
           access: 'write-only'
         }
       }
@@ -114,20 +124,6 @@ async function start() {
         visibility: GPUShaderStage.FRAGMENT,
         texture: {
           sampleType: 'float'
-        }
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: {
-          sampleType: 'float'
-        }
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.FRAGMENT,
-        buffer: {
-          type: 'uniform',
         }
       }
     ]
@@ -167,17 +163,18 @@ async function start() {
 
   const computeTexture = device.createTexture({
     size: presentationSize,
-    format: 'rgba8unorm',
+    format: 'rgba16float',
     usage:
     GPUTextureUsage.TEXTURE_BINDING |
     GPUTextureUsage.STORAGE_BINDING |
+    GPUTextureUsage.COPY_SRC |
     GPUTextureUsage.COPY_DST |
     GPUTextureUsage.RENDER_ATTACHMENT,
   });
-  
-  const canvasTexture = device.createTexture({
+
+  const computeCopyTexture = device.createTexture({
     size: presentationSize,
-    format: presentationFormat,
+    format: 'rgba16float',
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
   });
 
@@ -200,18 +197,7 @@ async function start() {
   sphereArray.set(sphereData);
   sphereBuffer.unmap();
 
-  //// RENDER UNIFORMS ////
-  const uniformBuffer = device.createBuffer({
-    size: vec4Size,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-    mappedAtCreation: true
-  });
-  const uniformData = new Float32Array(uniformBuffer.getMappedRange());
-  uniformData.set([timestep, 0, 0, 0]);
-  uniformBuffer.unmap();
-
   //// PIPELINE BIND GROUPS ////
-
   const computeBindGroup = device.createBindGroup({
     layout: computeBindGroupLayout,
     entries: [
@@ -229,6 +215,14 @@ async function start() {
       },
       {
         binding: 2,
+        resource: sampler,
+      },
+      {
+        binding: 3,
+        resource: computeCopyTexture.createView(),
+      },
+      {
+        binding: 4,
         resource: computeTexture.createView(),
       },
     ],
@@ -244,16 +238,6 @@ async function start() {
       {
         binding: 1,
         resource: computeTexture.createView(),
-      },
-      {
-        binding: 2,
-        resource: canvasTexture.createView(),
-      },
-      {
-        binding: 3,
-        resource: {
-          buffer: uniformBuffer,
-        },
       }
     ],
   });
@@ -322,9 +306,18 @@ async function start() {
       1
     );
     computePass.end();
+    // Copy the updated texture back
+    commandEncoder.copyTextureToTexture(
+      {
+        texture: computeTexture,
+      },
+      {
+        texture: computeCopyTexture,
+      },
+      presentationSize,
+    );
 
     ////RENDER PASS ////
-    device.queue.writeBuffer(uniformBuffer, 0, tsBuffer);
     const swapChainTexture = context.getCurrentTexture();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
@@ -340,16 +333,6 @@ async function start() {
     renderPass.setBindGroup(0, renderBindGroup);
     renderPass.draw(6, 1, 0, 0);
     renderPass.end();
-    // Copy the updated texture back
-    commandEncoder.copyTextureToTexture(
-      {
-        texture: swapChainTexture,
-      },
-      {
-        texture: canvasTexture,
-      },
-      presentationSize,
-    );
 
     device.queue.submit([commandEncoder.finish()]);
     timestep += 1;
