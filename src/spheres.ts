@@ -52,17 +52,17 @@ export const spheres = [
     emissive: vec3.fromValues(0, 0, 0),
   }),
   new Sphere({
-    position: vec3.fromValues(0, 3, 0),
-    radius: 2.2,
-    diffuse: vec3.fromValues(0.8, 0.8, 0.9),
+    position: vec3.fromValues(0, 8, 0),
+    radius: 5.2,
+    diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
-    emissive: vec3.fromValues(0.8, 0.8, 0.9),
+    emissive: vec3.fromValues(20.9, 20.9, 20.99),
   }),
   new Sphere({
     position: vec3.fromValues(3, 0, 0),
     radius: 1.5,
     diffuse: vec3.fromValues(0.8, 0.8, 0.5),
-    roughness: 0.1,
+    roughness: 0.01,
     emissive: vec3.fromValues(0, 0, 0),
   }),
 ];

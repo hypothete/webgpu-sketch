@@ -183,7 +183,7 @@ async function start() {
 
   //// CAMERA SETUP ////
   const camera = new Camera({
-    position: vec3.fromValues(0, 0, 3),
+    position: vec3.fromValues(0, 0, 4),
     width: presentationSize[0],
     height: presentationSize[1]
   });

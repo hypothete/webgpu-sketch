@@ -14,23 +14,34 @@ struct Uniform {
   timestep: f32;
 }
 
+var<private> EXPOSURE: f32 = 0.5;
+
+fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
+  let a = 2.51f;
+  let b = 0.03f;
+  let c = 2.43f;
+  let d = 0.59f;
+  let e = 0.14f;
+  return clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
 @stage(vertex)
 fn vert_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
   var pos = array<vec2<f32>, 6>(
-      vec2<f32>( 1.0,  1.0),
-      vec2<f32>( 1.0, -1.0),
-      vec2<f32>(-1.0, -1.0),
-      vec2<f32>( 1.0,  1.0),
-      vec2<f32>(-1.0, -1.0),
-      vec2<f32>(-1.0,  1.0));
+    vec2<f32>( 1.0,  1.0),
+    vec2<f32>( 1.0, -1.0),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>( 1.0,  1.0),
+    vec2<f32>(-1.0, -1.0),
+    vec2<f32>(-1.0,  1.0));
 
   var uv = array<vec2<f32>, 6>(
-      vec2<f32>(1.0, 0.0),
-      vec2<f32>(1.0, 1.0),
-      vec2<f32>(0.0, 1.0),
-      vec2<f32>(1.0, 0.0),
-      vec2<f32>(0.0, 1.0),
-      vec2<f32>(0.0, 0.0));
+    vec2<f32>(1.0, 0.0),
+    vec2<f32>(1.0, 1.0),
+    vec2<f32>(0.0, 1.0),
+    vec2<f32>(1.0, 0.0),
+    vec2<f32>(0.0, 1.0),
+    vec2<f32>(0.0, 0.0));
 
   var output : VertexOutput;
   output.Position = vec4<f32>(pos[VertexIndex], 0.0, 1.0);

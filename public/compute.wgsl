@@ -103,9 +103,9 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     vec2<f32>(uniforms.far, uniforms.near),
     vec3(0.0)
   );
-  var col = vec3<f32>(0.0, 0.0, 0.0);
+  var col = vec3<f32>(0.0);
   var throughput = vec3<f32>(1.0, 1.0, 1.0);
-  let bounces: u32 = 3u;
+  let bounces: u32 = 5u;
   var i: u32 = bounces;
   loop {
     if (i < 1u) {
@@ -117,10 +117,10 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
       break;
     }
     // Update ray
-    let doSpecular = rand(vec2<f32>(hit.xz - hit.yx)) > closestSphere.roughness;
+    let doSpecular = min(rand(vec2<f32>(hit.xz - hit.yx)), 1.0 - closestSphere.roughness);
     let diffuseDir = normalize(info.normal + randomOnUnitSphere(hit.xy - hit.yz));
     let specularDir = reflect((*r).direction, info.normal);
-    (*r).direction = mix(diffuseDir, specularDir, f32(doSpecular));
+    (*r).direction = mix(diffuseDir, specularDir, doSpecular);
     (*r).origin = hit + (*r).direction * EPSILON;
 
     // add color
@@ -147,7 +147,7 @@ fn main(
   let jitter = vec2<f32>(
     rand(vec2<f32>(x, y + uniforms.timestep)),
     rand(vec2(uniforms.timestep - y, x))
-  );
+  ) - 0.5;
 
   let rayOffset = vec3<f32>(
     (1.0 - 2.0 * ((jitter.x + x) / uniforms.resolution.x)) / aspect,
