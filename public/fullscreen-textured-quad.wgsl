@@ -47,7 +47,6 @@ fn vert_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 
 @stage(fragment)
 fn frag_main(@location(0) fragUV : vec2<f32>) -> @location(0) vec4<f32> {
-  let col1 = textureSample(computeTexture, mySampler, fragUV).rgb;
-  return vec4<f32>(ACESFilm(col1 * EXPOSURE), 1.0);
-  // return vec4<f32>(col1, 1.0);
+  let col = textureSample(computeTexture, mySampler, fragUV).rgb;
+  return vec4<f32>(ACESFilm(col * EXPOSURE), 1.0);
 }

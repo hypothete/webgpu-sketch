@@ -167,9 +167,7 @@ async function start() {
     usage:
     GPUTextureUsage.TEXTURE_BINDING |
     GPUTextureUsage.STORAGE_BINDING |
-    GPUTextureUsage.COPY_SRC |
-    GPUTextureUsage.COPY_DST |
-    GPUTextureUsage.RENDER_ATTACHMENT,
+    GPUTextureUsage.COPY_SRC
   });
 
   const computeCopyTexture = device.createTexture({

@@ -27,7 +27,7 @@ struct Info {
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var mySampler : sampler;
-@group(0) @binding(3) var computeTexture : texture_2d<f32>;
+@group(0) @binding(3) var computeCopyTexture : texture_2d<f32>;
 @group(0) @binding(4) var outputTex: texture_storage_2d<rgba16float, write>;
 
 var<private> UP: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
@@ -167,7 +167,13 @@ fn main(
     floor(y / uniforms.resolution.y)
   );
   let col1 = raytrace(&ray);
-  var col2 = textureSampleLevel(computeTexture, mySampler, uv, 0.0);
-  let col3 = mix(col1, col2, 1.0 - 1.0 / uniforms.timestep);
+  let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
+  var col3 = col1; // mix(col1.rgb, col2.rgb, 1.0 - 1.0 / uniforms.timestep);
+
+  // todo figure out why col2 is not drawing. It copies successfully
+  if (uniforms.timestep > 200.0) {
+    col3 = col2;
+  }
+
   textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
 }
