@@ -3,89 +3,8 @@
 // https://austin-eng.com/webgpu-samples/samples/imageBlur
 
 import { mat4, vec3, vec4 } from 'gl-matrix';
-
-//// CAMERA CLASS ////
-interface CameraOptions {
-  position: vec3;
-  target: vec3;
-  up: vec3;
-  fovy: number;
-  width: number;
-  height: number;
-  near: number;
-  far: number;
-}
-
-class Camera {
-  position: vec3 = vec3.create();
-  target: vec3 = vec3.create();
-  up: vec3 = vec3.fromValues(0, 1, 0);
-  projectionMatrix: mat4 = mat4.create();
-  viewMatrix: mat4 = mat4.create();
-  mvpMatrix: mat4 = mat4.create();
-  fovy: number = (2 * Math.PI) / 5;
-  width: number = 1;
-  height: number = 1;
-  near: number = 0.01;
-  far: number = 100;
-  buffer?: GPUBuffer;
-
-  constructor(options: Partial<CameraOptions>) {
-    Object.assign(this, options);
-    this.updateMatrices();
-  }
-
-  updateMatrices () {
-    mat4.perspective(
-      this.projectionMatrix,
-      this.fovy,
-      this.width / this.height,
-      this.near,
-      this.far
-    );
-    mat4.lookAt(
-      this.viewMatrix,
-      this.position,
-      this.target,
-      this.up
-    );
-    mat4.multiply(
-      this.mvpMatrix,
-      this.projectionMatrix,
-      this.viewMatrix
-    );
-  }
-
-  updateBuffer(device: GPUDevice) {
-    if (!this.buffer) throw Error('No camera buffer to update');
-    const cameraArray = Float32Array.from([
-      ...this.mvpMatrix as Float32Array,
-      this.width, this.height,
-      this.near, this.far,
-    ]);
-    device.queue.writeBuffer(
-      this.buffer,
-      0,
-      cameraArray
-    )
-  }
-
-  makeBuffer(device: GPUDevice) {
-    this.buffer = device.createBuffer({
-      size: 6 * vec4Size, // 4x4 matrix, resolution, near, far, timestep
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
-      mappedAtCreation: true,
-    });
-    const cameraArray = new Float32Array(this.buffer.getMappedRange());
-    cameraArray.set([
-      ...this.mvpMatrix as Float32Array,
-      this.width, this.height,
-      this.near, this.far,
-      0
-    ]);
-    this.buffer.unmap();
-  }
-}
+import Camera from './camera';
+import Sphere, {spheres} from './spheres';
 
 //// CONSTANTS AND INIT ////
 const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
@@ -203,6 +122,13 @@ async function start() {
         texture: {
           sampleType: 'float'
         }
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: {
+          type: 'uniform',
+        }
       }
     ]
   });
@@ -257,31 +183,32 @@ async function start() {
 
   //// CAMERA SETUP ////
   const camera = new Camera({
-    position: vec3.fromValues(0, 0, 5),
+    position: vec3.fromValues(0, 0, 3),
     width: presentationSize[0],
     height: presentationSize[1]
   });
   camera.makeBuffer(device);
 
   //// SPHERE ARRAY ////
-  const spherePositions = [
-    vec4.fromValues(-4, 0, 0, 1),
-    vec4.fromValues(-2, 0, 0, 1),
-    vec4.fromValues(0, 0, 0, 1),
-    vec4.fromValues(3, 0, 0, 1)
-  ];
+  const sphereData = spheres.flatMap(sphere => sphere.toArray());
   const sphereBuffer = device.createBuffer({
-    size: spherePositions.length * vec4Size,
+    size: spheres.length * Sphere.size,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     mappedAtCreation: true
   });
   const sphereArray = new Float32Array(sphereBuffer.getMappedRange());
-  sphereArray.set([
-    ...spherePositions.flatMap(spherePos => {
-      return [...spherePos.slice(0,3), 0.5];
-    })
-  ]);
+  sphereArray.set(sphereData);
   sphereBuffer.unmap();
+
+  //// RENDER UNIFORMS ////
+  const uniformBuffer = device.createBuffer({
+    size: vec4Size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
+    mappedAtCreation: true
+  });
+  const uniformData = new Float32Array(uniformBuffer.getMappedRange());
+  uniformData.set([timestep, 0, 0, 0]);
+  uniformBuffer.unmap();
 
   //// PIPELINE BIND GROUPS ////
 
@@ -322,6 +249,12 @@ async function start() {
         binding: 2,
         resource: canvasTexture.createView(),
       },
+      {
+        binding: 3,
+        resource: {
+          buffer: uniformBuffer,
+        },
+      }
     ],
   });
 
@@ -359,6 +292,7 @@ async function start() {
       rotX = 1;
     }
     if (dirty) {
+      timestep = 1;
       const rotYMat = mat4.create();
       mat4.fromRotation(rotYMat, 0.02 * rotY, camera.up);
       vec3.transformMat4(camera.position, camera.position, rotYMat);
@@ -372,10 +306,10 @@ async function start() {
       camera.updateMatrices();
       camera.updateBuffer(device);
     }
-
-    //// COMPUTE PASS ////
+    
     // update timestep
     const tsBuffer = Float32Array.from([timestep]);
+    //// COMPUTE PASS ////
     device.queue.writeBuffer(camera.buffer as GPUBuffer, vec4Size * 5, tsBuffer);
     // start pass
     const computePass = commandEncoder.beginComputePass();
@@ -390,6 +324,7 @@ async function start() {
     computePass.end();
 
     ////RENDER PASS ////
+    device.queue.writeBuffer(uniformBuffer, 0, tsBuffer);
     const swapChainTexture = context.getCurrentTexture();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [

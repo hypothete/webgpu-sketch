@@ -9,6 +9,9 @@ struct Uniforms {
 struct Sphere {
   position: vec3<f32>;
   radius: f32;
+  diffuse: vec3<f32>;
+  roughness: f32;
+  emissive: vec3<f32>;
 }
 
 struct Ray {
@@ -28,9 +31,6 @@ struct Info {
 var<private> UP: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
 var<private> PI: f32 = 3.141592653589;
 var<private> EPSILON: f32 = 0.001;
-var<private> SKYDOWN: vec4<f32> = vec4<f32>(0.3, 0.3, 0.9, 1.0);
-var<private> SKYUP: vec4<f32> = vec4<f32>(0.9, 0.9, 1.0, 1.0);
-
 
 fn rand(co: vec2<f32>) -> f32 {
   return fract(sin(dot(co.xy ,vec2<f32>(12.9898,78.233))) * 43758.5453);
@@ -69,14 +69,10 @@ fn sphereNormal(s: Sphere, p: vec3<f32>) -> vec3<f32> {
   return normalize(p - s.position);
 }
 
-fn getSkyColor(dir: vec3<f32>) -> vec4<f32> {
-  let skyAmt = clamp(dot(dir, UP), 0.0, 1.0);
-  return mix(SKYDOWN, SKYUP, skyAmt);
-}
-
-fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
+fn intersectSpheres(r: Ray,  info: ptr<function,Info>) -> Sphere  {
   let numSpheres = arrayLength(&spheres);
   var i: u32 = 0u;
+  var closestSphere: Sphere;
   loop {
     if (i >= numSpheres) {
       break;
@@ -84,7 +80,10 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
     // project sphere into camera space
     let movedSphere = Sphere(
       (uniforms.mvpMatrix * vec4<f32>(spheres[i].position, 1.0)).xyz,
-      spheres[i].radius
+      spheres[i].radius,
+      vec3<f32>(0.0),
+      0.0,
+      vec3<f32>(0.0),
     );
     let sphereIntersections = intersectSphere(r, movedSphere);
     if (sphereIntersections.x > uniforms.near &&
@@ -92,9 +91,11 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
       sphereIntersections.x < (*info).lengths.x) {
         (*info).lengths.x = sphereIntersections.x;
         (*info).normal = sphereNormal(movedSphere, rayAt(r, sphereIntersections.x));
+        closestSphere = spheres[i];
     }
     i = i + 1u;
   }
+  return closestSphere;
 }
 
 fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
@@ -102,31 +103,33 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     vec2<f32>(uniforms.far, uniforms.near),
     vec3(0.0)
   );
-  var col = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  var col = vec3<f32>(0.0, 0.0, 0.0);
+  var throughput = vec3<f32>(1.0, 1.0, 1.0);
   let bounces: u32 = 3u;
   var i: u32 = bounces;
   loop {
     if (i < 1u) {
       break;
     }
-    intersectSpheres(*r, &info);
+    let closestSphere = intersectSpheres(*r, &info);
     let hit = rayAt(*r, info.lengths.x);
     if (info.lengths.x >= uniforms.far) {
-      col = col * getSkyColor((*r).direction);
       break;
     }
-    var lambert = info.normal + randomOnUnitSphere(hit.xy - hit.yz);
-    lambert = clamp(lambert, vec3<f32>(0.0), vec3<f32>(1.0));
-    let specular = reflect((*r).direction, info.normal);
-    let albedo = vec4<f32>(0.5, 0.5, 0.5, 1.0);
-    // todo: finish shading once camera movement and lights are in
-    col = col * vec4<f32>(lambert, 1.0); // * (ambient + getSkyColor(mix(lambert, specular, 0.9)));
-    // bounce ray
-    (*r).direction = mix(lambert, specular, 0.99);
+    // Update ray
+    let doSpecular = rand(vec2<f32>(hit.xz - hit.yx)) > closestSphere.roughness;
+    let diffuseDir = normalize(info.normal + randomOnUnitSphere(hit.xy - hit.yz));
+    let specularDir = reflect((*r).direction, info.normal);
+    (*r).direction = mix(diffuseDir, specularDir, f32(doSpecular));
     (*r).origin = hit + (*r).direction * EPSILON;
+
+    // add color
+    col = col + closestSphere.emissive * throughput;
+    throughput = throughput * closestSphere.diffuse;
+    // todo add specular color to sphere
     i = i - 1u;
   }
-  return col;
+  return vec4<f32>(col, 1.0);
 }
 
 @stage(compute) @workgroup_size(16, 16, 1)
