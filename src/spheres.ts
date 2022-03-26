@@ -45,25 +45,41 @@ export const spheres = [
     emissive: vec3.fromValues(0, 0, 0),
   }),
   new Sphere({
-    position: vec3.fromValues(-2, 0, 0),
+    position: vec3.fromValues(-0.2, 0, 0),
     radius: 0.4,
-    diffuse: vec3.fromValues(7.0, 0.7, 1.0),
+    diffuse: vec3.fromValues(1.0, 0.2, 0.3),
     roughness: 0.99,
     emissive: vec3.fromValues(0, 0, 0),
-  }),
-  new Sphere({
-    position: vec3.fromValues(0, 2, 0),
-    radius: 1.2,
-    diffuse: vec3.fromValues(0.0, 0.0, 0.0),
-    roughness: 0.99,
-    emissive: vec3.fromValues(20.9, 20.9, 20.99),
   }),
   new Sphere({
     position: vec3.fromValues(3, 0, 0),
     radius: 1.5,
     diffuse: vec3.fromValues(0.8, 0.8, 0.5),
-    roughness: 0.0,
+    roughness: 0.2,
     emissive: vec3.fromValues(0, 0, 0),
+  }),
+
+  // lights
+  new Sphere({
+    position: vec3.fromValues(-2, 2, 0),
+    radius: 0.8,
+    diffuse: vec3.fromValues(0.0, 0.0, 0.0),
+    roughness: 0.99,
+    emissive: vec3.fromValues(20.9, 20.9, 20.99),
+  }),
+  new Sphere({
+    position: vec3.fromValues(-2, -1, 5),
+    radius: 0.5,
+    diffuse: vec3.fromValues(0.0, 0.0, 0.0),
+    roughness: 0.99,
+    emissive: vec3.fromValues(20.9, 1.3, 20.99),
+  }),
+  new Sphere({
+    position: vec3.fromValues(0, 0, -5),
+    radius: 0.5,
+    diffuse: vec3.fromValues(0.0, 0.0, 0.0),
+    roughness: 0.99,
+    emissive: vec3.fromValues(0.9, 20.9, 20.99),
   }),
 ];
 
