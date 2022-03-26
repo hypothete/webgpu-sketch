@@ -4,7 +4,7 @@ import Sphere, {spheres} from './spheres';
 
 //// CONSTANTS AND INIT ////
 const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
-let timestep = 0;
+let timestep = 1;
 let keys: Record<string, boolean> = {};
 start();
 
@@ -157,8 +157,8 @@ async function start() {
 
   //// TEXTURE SETUP ////
   const sampler = device.createSampler({
-    magFilter: 'linear',
-    minFilter: 'linear',
+    magFilter: 'nearest',
+    minFilter: 'nearest',
   });
 
   const computeTexture = device.createTexture({

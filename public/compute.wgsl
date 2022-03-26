@@ -142,8 +142,6 @@ fn main(
 
   let x = f32(global_id.x);
   let y = f32(global_id.y);
-  let lx = f32(local_id.x);
-  let ly = f32(local_id.y);
   let aspect = uniforms.resolution.y / uniforms.resolution.x;
 
   let jitter = vec2<f32>(
@@ -157,27 +155,19 @@ fn main(
     1.0
   );
 
-  // note: can't get pointers to lets
   var ray = Ray(
     vec3<f32>(0.0),
     normalize(rayOffset)
   );
+
   let uv = vec2<f32>(
-    floor(x / uniforms.resolution.x),
-    floor(y / uniforms.resolution.y)
+    (x / uniforms.resolution.x),
+    (y / uniforms.resolution.y)
   );
+
   let col1 = raytrace(&ray);
   let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
-  var col3 = col1; // mix(col1.rgb, col2.rgb, 1.0 - 1.0 / uniforms.timestep);
-
-  // todo figure out why col2 is not drawing.
-  // If the next if statement is commented out and you switch the render pass to draw
-  // from computeCopyTexture, you can see that the copy succeeds.
-  // no idea why it fails here
-  
-  if (uniforms.timestep > 200.0) {
-    col3 = col2;
-  }
+  let col3 = mix(col1, col2, 1.0 - 1.0 / uniforms.timestep);
 
   textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
 }

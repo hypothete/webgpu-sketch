@@ -10,7 +10,7 @@ struct Uniform {
   timestep: f32;
 }
 
-var<private> EXPOSURE: f32 = 1.0;
+var<private> EXPOSURE: f32 = 0.5;
 
 fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   let a = 2.51f;

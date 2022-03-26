@@ -46,14 +46,14 @@ export const spheres = [
   }),
   new Sphere({
     position: vec3.fromValues(-2, 0, 0),
-    radius: 0.33,
+    radius: 0.4,
     diffuse: vec3.fromValues(7.0, 0.7, 1.0),
     roughness: 0.99,
     emissive: vec3.fromValues(0, 0, 0),
   }),
   new Sphere({
-    position: vec3.fromValues(0, 5, 3),
-    radius: 5.2,
+    position: vec3.fromValues(0, 2, 0),
+    radius: 1.2,
     diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
     emissive: vec3.fromValues(20.9, 20.9, 20.99),
@@ -62,7 +62,7 @@ export const spheres = [
     position: vec3.fromValues(3, 0, 0),
     radius: 1.5,
     diffuse: vec3.fromValues(0.8, 0.8, 0.5),
-    roughness: 0.01,
+    roughness: 0.0,
     emissive: vec3.fromValues(0, 0, 0),
   }),
 ];
