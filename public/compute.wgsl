@@ -170,7 +170,11 @@ fn main(
   let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
   var col3 = col1; // mix(col1.rgb, col2.rgb, 1.0 - 1.0 / uniforms.timestep);
 
-  // todo figure out why col2 is not drawing. It copies successfully
+  // todo figure out why col2 is not drawing.
+  // If the next if statement is commented out and you switch the render pass to draw
+  // from computeCopyTexture, you can see that the copy succeeds.
+  // no idea why it fails here
+  
   if (uniforms.timestep > 200.0) {
     col3 = col2;
   }
