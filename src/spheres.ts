@@ -48,7 +48,7 @@ export const spheres = [
 
   // red
   new Sphere({
-    position: vec3.fromValues(-2.8, 0, 0),
+    position: vec3.fromValues(-0.2, 0, 0),
     radius: 0.4,
     diffuse: vec3.fromValues(1.0, 0.3, 0.3),
     roughness: 0.99,
