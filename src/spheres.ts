@@ -37,49 +37,63 @@ class Sphere {
 
 // sample spheres
 export const spheres = [
+  // blue
   new Sphere({
     position: vec3.fromValues(-4, 0, 0),
     radius: 0.8,
-    diffuse: vec3.fromValues(0.1, 0.7, 0.99),
-    roughness: 0.9,
+    diffuse: vec3.fromValues(0.3, 0.5, 1.0),
+    roughness: 0.7,
     emissive: vec3.fromValues(0, 0, 0),
   }),
+
+  // red
   new Sphere({
-    position: vec3.fromValues(-0.2, 0, 0),
+    position: vec3.fromValues(-2.8, 0, 0),
     radius: 0.4,
-    diffuse: vec3.fromValues(1.0, 0.2, 0.3),
+    diffuse: vec3.fromValues(1.0, 0.3, 0.3),
     roughness: 0.99,
     emissive: vec3.fromValues(0, 0, 0),
   }),
+
+  // reflective
   new Sphere({
     position: vec3.fromValues(3, 0, 0),
     radius: 1.5,
-    diffuse: vec3.fromValues(0.8, 0.8, 0.5),
-    roughness: 0.2,
+    diffuse: vec3.fromValues(0.8, 0.8, 0.6),
+    roughness: 0.1,
+    emissive: vec3.fromValues(0, 0, 0),
+  }),
+
+  // ground
+  new Sphere({
+    position: vec3.fromValues(0, -500, 0),
+    radius: 498,
+    diffuse: vec3.fromValues(0.9, 0.9, 0.9),
+    roughness: 1.0,
     emissive: vec3.fromValues(0, 0, 0),
   }),
 
   // lights
   new Sphere({
-    position: vec3.fromValues(-2, 2, 0),
+    position: vec3.fromValues(-0, 2, 0),
     radius: 0.8,
     diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
-    emissive: vec3.fromValues(20.9, 20.9, 20.99),
+    emissive: vec3.fromValues(20, 20, 10),
   }),
   new Sphere({
     position: vec3.fromValues(-2, -1, 5),
     radius: 0.5,
     diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
-    emissive: vec3.fromValues(20.9, 1.3, 20.99),
+    emissive: vec3.fromValues(20, 10, 20),
   }),
   new Sphere({
     position: vec3.fromValues(0, 0, -5),
     radius: 0.5,
     diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
-    emissive: vec3.fromValues(0.9, 20.9, 20.99),
+    emissive: vec3.fromValues(10, 20, 20),
   }),
 ];
 

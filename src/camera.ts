@@ -18,8 +18,9 @@ class Camera {
   target: vec3 = vec3.create();
   up: vec3 = vec3.fromValues(0, 1, 0);
   projectionMatrix: mat4 = mat4.create();
+  iProjectionMatrix: mat4 = mat4.create();
   viewMatrix: mat4 = mat4.create();
-  mvpMatrix: mat4 = mat4.create();
+  iViewMatrix: mat4 = mat4.create();
   fovy: number = (2 * Math.PI) / 5;
   width: number = 1;
   height: number = 1;
@@ -46,17 +47,15 @@ class Camera {
       this.target,
       this.up
     );
-    mat4.multiply(
-      this.mvpMatrix,
-      this.projectionMatrix,
-      this.viewMatrix
-    );
+    mat4.invert(this.iViewMatrix, this.viewMatrix);
+    mat4.invert(this.iProjectionMatrix, this.projectionMatrix);
   }
 
   updateBuffer(device: GPUDevice) {
     if (!this.buffer) throw Error('No camera buffer to update');
     const cameraArray = Float32Array.from([
-      ...this.mvpMatrix as Float32Array,
+      ...this.iViewMatrix as Float32Array,
+      ...this.iProjectionMatrix as Float32Array,
       this.width, this.height,
       this.near, this.far,
     ]);
@@ -69,18 +68,24 @@ class Camera {
 
   makeBuffer(device: GPUDevice) {
     this.buffer = device.createBuffer({
-      size: 6 * vec4Size, // 4x4 matrix, resolution, near, far, timestep
+      size: (4 + 4 + 2) * vec4Size, // 2 4x4 matrices, resolution, near, far, timestep
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
       mappedAtCreation: true,
     });
     const cameraArray = new Float32Array(this.buffer.getMappedRange());
     cameraArray.set([
-      ...this.mvpMatrix as Float32Array,
+      ...this.iViewMatrix as Float32Array,
+      ...this.iProjectionMatrix as Float32Array,
       this.width, this.height,
       this.near, this.far,
       0
     ]);
     this.buffer.unmap();
+  }
+
+  updateTimestep(device: GPUDevice, timestep: number) {
+    const tsBuffer = Float32Array.from([timestep]);
+    device.queue.writeBuffer(this.buffer as GPUBuffer, vec4Size * 9, tsBuffer);
   }
 }
 

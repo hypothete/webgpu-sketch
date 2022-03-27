@@ -1,5 +1,6 @@
 struct Uniforms {
-  mvpMatrix: mat4x4<f32>;
+  iViewMatrix: mat4x4<f32>;
+  iProjectionMatrix: mat4x4<f32>;
   resolution: vec2<f32>;
   near: f32;
   far: f32;
@@ -30,25 +31,31 @@ struct Info {
 @group(0) @binding(3) var computeCopyTexture : texture_2d<f32>;
 @group(0) @binding(4) var outputTex: texture_storage_2d<rgba16float, write>;
 
-var<private> UP: vec3<f32> = vec3<f32>(0.0, 1.0, 0.0);
-var<private> PI: f32 = 3.141592653589;
-var<private> EPSILON: f32 = 0.001;
+let PI: f32 = 3.141592653589;
+let EPSILON: f32 = 0.001;
+let RAY_BOUNCES: u32 = 4u;
+let SAMPLES: u32 = 8u;
 
-fn rand(co: vec2<f32>) -> f32 {
-  return fract(sin(dot(co.xy ,vec2<f32>(12.9898,78.233))) * 43758.5453);
+var<private> RNGSTATE: u32 = 42u;
+
+fn pcgHash() -> u32 {
+  let state = RNGSTATE;
+  RNGSTATE = RNGSTATE * 747796405u + 2891336453u;
+  let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+  return (word >> 22u) ^ word;
 }
 
-fn randomOnUnitSphere(q: vec2<f32>) -> vec3<f32> {
-  var p: vec3<f32>;
-  var x = rand(q * vec2<f32>(-1.0, 7.0));
-  var y = rand(q * vec2<f32>(9.0, 3.0));
-  var z = rand(q * vec2<f32>(-22.0, 4.0));
-  x = x / cos(x);
-  y = y / cos(y);
-  z = z / cos(z);
-  p = 2.0 * vec3<f32>(x,y,z) - 1.0;
-  p = normalize(p);
-  return p;
+fn randomFloat() -> f32 {
+  return f32(pcgHash()) / 4294967296.0;
+}
+
+fn randomUnitVector() -> vec3<f32> {
+  let z = randomFloat() * 2.0 - 1.0;
+  let a = randomFloat() * (PI * 2.0);
+  let r = sqrt(1.0 - z * z);
+  let x = r * cos(a);
+  let y = r * sin(a);
+  return vec3<f32>(x, y, z);
 }
 
 fn intersectSphere(r: Ray, s: Sphere) -> vec2<f32> {
@@ -79,20 +86,12 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>) -> Sphere  {
     if (i >= numSpheres) {
       break;
     }
-    // project sphere into camera space
-    let movedSphere = Sphere(
-      (uniforms.mvpMatrix * vec4<f32>(spheres[i].position, 1.0)).xyz,
-      spheres[i].radius,
-      vec3<f32>(0.0),
-      0.0,
-      vec3<f32>(0.0),
-    );
-    let sphereIntersections = intersectSphere(r, movedSphere);
+    let sphereIntersections = intersectSphere(r, spheres[i]);
     if (sphereIntersections.x > uniforms.near &&
       sphereIntersections.x < sphereIntersections.y &&
       sphereIntersections.x < (*info).lengths.x) {
         (*info).lengths.x = sphereIntersections.x;
-        (*info).normal = sphereNormal(movedSphere, rayAt(r, sphereIntersections.x));
+        (*info).normal = sphereNormal(spheres[i], rayAt(r, sphereIntersections.x));
         closestSphere = spheres[i];
     }
     i = i + 1u;
@@ -107,8 +106,7 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
   );
   var col = vec3<f32>(0.0);
   var throughput = vec3<f32>(1.0, 1.0, 1.0);
-  let bounces: u32 = 4u;
-  var i: u32 = bounces;
+  var i: u32 = RAY_BOUNCES;
   loop {
     if (i < 1u) {
       break;
@@ -118,9 +116,10 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     if (info.lengths.x >= uniforms.far) {
       break;
     }
-    // Update ray
-    let doSpecular = rand(vec2<f32>(hit.xz - hit.yx));
-    let diffuseDir = normalize(info.normal + randomOnUnitSphere(hit.xy - hit.yz));
+    // col = info.normal;
+    // break;
+    let doSpecular = randomFloat();
+    let diffuseDir = normalize(info.normal + randomUnitVector());
     let specularDir = reflect((*r).direction, info.normal);
     (*r).direction = select(diffuseDir, specularDir, doSpecular > closestSphere.roughness);
     (*r).origin = hit + (*r).direction * EPSILON;
@@ -132,6 +131,7 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     i = i - 1u;
   }
   return vec4<f32>(col, 1.0);
+  // return vec4<f32>(f32(i/bounces), 0.0, 0.0, 1.0); // debug for bounces
 }
 
 @stage(compute) @workgroup_size(16, 16, 1)
@@ -142,30 +142,41 @@ fn main(
 
   let x = f32(global_id.x);
   let y = f32(global_id.y);
+  RNGSTATE = u32(uniforms.timestep * x * y);
   let aspect = uniforms.resolution.y / uniforms.resolution.x;
-
-  let jitter = vec2<f32>(
-    rand(vec2<f32>(x, y + uniforms.timestep)),
-    rand(vec2(uniforms.timestep - y, x))
-  ) - 0.5;
-
-  let rayOffset = vec3<f32>(
-    (1.0 - 2.0 * ((jitter.x + x) / uniforms.resolution.x)) / aspect,
-    (1.0 - 2.0 * ((jitter.y + y) / uniforms.resolution.y)),
-    1.0
-  );
-
-  var ray = Ray(
-    vec3<f32>(0.0),
-    normalize(rayOffset)
-  );
-
   let uv = vec2<f32>(
     (x / uniforms.resolution.x),
     (y / uniforms.resolution.y)
   );
+  let camPosition = uniforms.iViewMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
-  let col1 = raytrace(&ray);
+  var col1 = vec4<f32>();
+
+  var i: u32 = 0u;
+  loop {
+    if (i >= SAMPLES) {
+      break;
+    }
+    let jitter = vec2<f32>(randomFloat(), randomFloat()) - 0.5;
+    var rayDirection = uniforms.iViewMatrix * (uniforms.iProjectionMatrix * vec4<f32>(
+      (2.0 * (jitter.x + x) / uniforms.resolution.x) - 1.0,
+      (1.0 - 2.0 * (jitter.y + y) / uniforms.resolution.y),
+      1.0,
+      1.0
+    ));
+
+    rayDirection = vec4<f32>(normalize(rayDirection.xyz), 1.0);
+    
+    var ray = Ray(
+      camPosition.xyz,
+      rayDirection.xyz
+    );
+
+    col1 = col1 + raytrace(&ray);
+    i = i + 1u;
+  }
+  col1 = vec4<f32>(col1.rgb / 8.0, 1.0);
+
   let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
   let col3 = mix(col1, col2, 1.0 - 1.0 / uniforms.timestep);
 

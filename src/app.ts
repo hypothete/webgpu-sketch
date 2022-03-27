@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { vec3, mat4 } from 'gl-matrix';
 import Camera from './camera';
 import Sphere, {spheres} from './spheres';
 
@@ -178,7 +178,7 @@ async function start() {
 
   //// CAMERA SETUP ////
   const camera = new Camera({
-    position: vec3.fromValues(0, 0, 4),
+    position: vec3.fromValues(-6, 0, 6),
     width: presentationSize[0],
     height: presentationSize[1]
   });
@@ -259,6 +259,8 @@ async function start() {
     let dirty = false;
     let rotY = 0;
     let rotX = 0;
+    let zoom = 0;
+
     if (keys['a']) {
       dirty = true;
       rotY = -1;
@@ -266,18 +268,29 @@ async function start() {
       dirty = true;
       rotY = 1;
     }
+
     if (keys['w']) {
       dirty = true;
-      rotX = -1;
+      rotX = 1;
     } else if (keys['s']) {
       dirty = true;
-      rotX = 1;
+      rotX = -1;
     }
+
+    if (keys['q']) {
+      dirty = true;
+      zoom = -1;
+    } else if (keys['z']) {
+      dirty = true;
+      zoom = 1;
+    }
+
     if (dirty) {
       timestep = 1;
       const rotYMat = mat4.create();
       mat4.fromRotation(rotYMat, 0.02 * rotY, camera.up);
       vec3.transformMat4(camera.position, camera.position, rotYMat);
+
       const rotXMat = mat4.create();
       const xOrtho = vec3.create();
       const toTarget = vec3.create();
@@ -285,14 +298,15 @@ async function start() {
       vec3.cross(xOrtho, toTarget, camera.up);
       mat4.fromRotation(rotXMat, 0.02 * rotX, xOrtho);
       vec3.transformMat4(camera.position, camera.position, rotXMat);
+
+      vec3.scale(camera.position, camera.position, 1 + zoom * 0.02);
+
       camera.updateMatrices();
       camera.updateBuffer(device);
     }
-    
-    // update timestep
-    const tsBuffer = Float32Array.from([timestep]);
+
     //// COMPUTE PASS ////
-    device.queue.writeBuffer(camera.buffer as GPUBuffer, vec4Size * 5, tsBuffer);
+    camera.updateTimestep(device, timestep);
     // start pass
     const computePass = commandEncoder.beginComputePass();
     computePass.setPipeline(computePipeline);
