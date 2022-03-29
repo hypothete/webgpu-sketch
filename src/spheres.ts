@@ -60,7 +60,7 @@ export const spheres = [
     position: vec3.fromValues(3, 0, 0),
     radius: 1.5,
     diffuse: vec3.fromValues(0.8, 0.8, 0.6),
-    roughness: 0.01,
+    roughness: 0.1,
     emissive: vec3.fromValues(0, 0, 0),
   }),
 

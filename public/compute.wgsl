@@ -15,6 +15,12 @@ struct Sphere {
   emissive: vec3<f32>;
 }
 
+struct Triangle {
+  a: vec3<f32>;
+  b: vec3<f32>;
+  c: vec3<f32>;
+}
+
 struct Ray {
   origin: vec3<f32>;
   direction: vec3<f32>;
@@ -35,6 +41,7 @@ let PI: f32 = 3.141592653589;
 let EPSILON: f32 = 0.001;
 let RAY_BOUNCES: u32 = 4u;
 let SAMPLES: u32 = 8u;
+let SKY_COLOR: vec3<f32> = vec3<f32>(0.6, 0.65, 0.8);
 
 var<private> RNGSTATE: u32 = 42u;
 
@@ -68,6 +75,32 @@ fn intersectSphere(r: Ray, s: Sphere) -> vec2<f32> {
     (-b - h) / a,
     (-b + h) / a
   ); // get intersect pts
+}
+
+fn intersectTriangle(r: Ray, t: Triangle) -> f32 {
+  let edge1 = t.b - t.a;
+  let edge2 = t.c - t.a;
+  let h = cross(r.direction, edge2);
+  let a = dot(edge1, h);
+  if (a > -EPSILON && a < EPSILON) {
+    return -1.0;
+  }
+  let f = 1.0 / a;
+  let s = r.origin - t.a;
+  let u = f * dot(s, h);
+  if (u < 0.0 || u > 1.0) {
+    return -1.0;
+  }
+  let q = cross(s, edge1);
+  let v = f * dot(r.direction, q);
+  if (v < 0.0 || u + v > 1.0) {
+    return -1.0;
+  }
+  let t1 = f * dot(edge2, q);
+  if (t1 > EPSILON) {
+    return t1;
+  }
+  return -1.0;
 }
 
 fn rayAt(r: Ray, t: f32) -> vec3<f32> {
@@ -122,10 +155,6 @@ fn fresnelReflectAmount (n1: f32, n2: f32, normal: vec3<f32>, incident: vec3<f32
 
 
 fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
-  var info: Info = Info(
-    vec2<f32>(uniforms.far, uniforms.near),
-    vec3(0.0)
-  );
   var col = vec3<f32>(0.0);
   var throughput = vec3<f32>(1.0, 1.0, 1.0);
   var i: u32 = RAY_BOUNCES;
@@ -133,18 +162,23 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     if (i < 1u) {
       break;
     }
+    var info: Info = Info(
+      vec2<f32>(uniforms.far, uniforms.near),
+      vec3(0.0)
+    );
     let closestSphere = intersectSpheres(*r, &info);
-    let hit = rayAt(*r, info.lengths.x);
-    if (info.lengths.x > uniforms.far) {
+    if (info.lengths.x >= uniforms.far) {
+      col = col + SKY_COLOR * throughput;
       break;
     }
     // col = info.normal;
     // break;
     let doSpecular = randomFloat();
+    let hit = rayAt(*r, info.lengths.x);
     let diffuseDir = normalize(info.normal + randomUnitVector());
     let specularDir = reflect((*r).direction, info.normal);
     let fresnel = fresnelReflectAmount(1.0, 1.5, info.normal, (*r).direction, 1.0 - closestSphere.roughness);
-    (*r).direction = normalize(mix(diffuseDir, specularDir, max(0.0, fresnel) * doSpecular - closestSphere.roughness));
+    (*r).direction = normalize(mix(diffuseDir, specularDir, max(doSpecular, fresnel) - closestSphere.roughness));
     (*r).origin = hit + (*r).direction * EPSILON;
 
     // add color
