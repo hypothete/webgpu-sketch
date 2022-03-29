@@ -99,6 +99,28 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>) -> Sphere  {
   return closestSphere;
 }
 
+fn fresnelReflectAmount (n1: f32, n2: f32, normal: vec3<f32>, incident: vec3<f32>, reflectivity: f32) -> f32 {
+  // Schlick aproximation
+  var r0 = (n1-n2) / (n1+n2);
+  r0 = r0 * r0;
+  var cosX = -dot(normal, incident);
+  if (n1 > n2) {
+    let n = n1/n2;
+    let sinT2 = n*n*(1.0-cosX*cosX);
+    // Total internal reflection
+    if (sinT2 > 1.0) {
+      return 1.0;
+    }
+    cosX = sqrt(1.0-sinT2);
+  }
+  let x = 1.0-cosX;
+  var ret = r0+(1.0-r0)*x*x*x*x*x;
+  // adjust reflect multiplier for object reflectivity
+  ret = (reflectivity + (1.0-reflectivity) * ret);
+  return ret;
+}
+
+
 fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
   var info: Info = Info(
     vec2<f32>(uniforms.far, uniforms.near),
@@ -113,7 +135,7 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     }
     let closestSphere = intersectSpheres(*r, &info);
     let hit = rayAt(*r, info.lengths.x);
-    if (info.lengths.x >= uniforms.far) {
+    if (info.lengths.x > uniforms.far) {
       break;
     }
     // col = info.normal;
@@ -121,7 +143,8 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     let doSpecular = randomFloat();
     let diffuseDir = normalize(info.normal + randomUnitVector());
     let specularDir = reflect((*r).direction, info.normal);
-    (*r).direction = select(diffuseDir, specularDir, doSpecular > closestSphere.roughness);
+    let fresnel = fresnelReflectAmount(1.0, 1.5, info.normal, (*r).direction, 1.0 - closestSphere.roughness);
+    (*r).direction = normalize(mix(diffuseDir, specularDir, max(0.0, fresnel) * doSpecular - closestSphere.roughness));
     (*r).origin = hit + (*r).direction * EPSILON;
 
     // add color
@@ -175,7 +198,7 @@ fn main(
     col1 = col1 + raytrace(&ray);
     i = i + 1u;
   }
-  col1 = vec4<f32>(col1.rgb / 8.0, 1.0);
+  col1 = vec4<f32>(col1.rgb / f32(SAMPLES), 1.0);
 
   let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
   let col3 = mix(col1, col2, 1.0 - 1.0 / uniforms.timestep);

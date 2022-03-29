@@ -60,7 +60,7 @@ export const spheres = [
     position: vec3.fromValues(3, 0, 0),
     radius: 1.5,
     diffuse: vec3.fromValues(0.8, 0.8, 0.6),
-    roughness: 0.1,
+    roughness: 0.01,
     emissive: vec3.fromValues(0, 0, 0),
   }),
 
@@ -76,14 +76,14 @@ export const spheres = [
   // lights
   new Sphere({
     position: vec3.fromValues(-0, 2, 0),
-    radius: 0.8,
+    radius: 0.7,
     diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
     emissive: vec3.fromValues(20, 20, 10),
   }),
   new Sphere({
     position: vec3.fromValues(-2, -1, 5),
-    radius: 0.5,
+    radius: 0.4,
     diffuse: vec3.fromValues(0.0, 0.0, 0.0),
     roughness: 0.99,
     emissive: vec3.fromValues(20, 10, 20),

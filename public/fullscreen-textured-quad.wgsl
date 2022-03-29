@@ -1,16 +1,15 @@
 @group(0) @binding(0) var mySampler : sampler;
 @group(0) @binding(1) var computeTexture : texture_2d<f32>;
+@group(0) @binding(2) var<uniform> uniforms: Uniforms;
 
 struct VertexOutput {
   @builtin(position) Position : vec4<f32>;
   @location(0) fragUV : vec2<f32>;
 };
 
-struct Uniform {
-  timestep: f32;
+struct Uniforms {
+  exposure: f32;
 }
-
-var<private> EXPOSURE: f32 = 2.0;
 
 fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   let a = 2.51f;
@@ -48,5 +47,6 @@ fn vert_main(@builtin(vertex_index) VertexIndex : u32) -> VertexOutput {
 @stage(fragment)
 fn frag_main(@location(0) fragUV : vec2<f32>) -> @location(0) vec4<f32> {
   let col = textureSample(computeTexture, mySampler, fragUV).rgb;
-  return vec4<f32>(ACESFilm(col * EXPOSURE), 1.0);
+  //return vec4<f32>(ACESFilm(col * uniforms.exposure), 1.0);
+  return vec4<f32>(col, 1.0);
 }

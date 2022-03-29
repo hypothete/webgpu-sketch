@@ -125,7 +125,14 @@ async function start() {
         texture: {
           sampleType: 'float'
         }
-      }
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.FRAGMENT,
+        buffer: {
+          type: 'uniform',
+        }
+      },
     ]
   });
 
@@ -195,6 +202,18 @@ async function start() {
   sphereArray.set(sphereData);
   sphereBuffer.unmap();
 
+  //// RENDER UNIFORMS ////
+  const renderUniformBuffer = device.createBuffer({
+    size: spheres.length * Sphere.size,
+    usage: GPUBufferUsage.UNIFORM,
+    mappedAtCreation: true
+  });
+  const renderUniformArray = new Float32Array(renderUniformBuffer.getMappedRange());
+  renderUniformArray.set([
+    8.0,
+  ]);
+  renderUniformBuffer.unmap();
+
   //// PIPELINE BIND GROUPS ////
   const computeBindGroup = device.createBindGroup({
     layout: computeBindGroupLayout,
@@ -236,7 +255,13 @@ async function start() {
       {
         binding: 1,
         resource: computeTexture.createView(),
-      }
+      },
+      {
+        binding: 2,
+        resource: {
+          buffer: renderUniformBuffer,
+        },
+      },
     ],
   });
 
