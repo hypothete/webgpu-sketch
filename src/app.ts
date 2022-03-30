@@ -24,11 +24,17 @@ async function start() {
   const context = canvas.getContext('webgpu');
   if (!context) throw Error("Couldn't create a WebGPU context.");
 
+  //// LOAD RELEVANT FILES ////
   const computeWGSL = await fetch('/compute.wgsl')
     .then(response => response.text());
 
   const fullscreenTexturedQuadWGSL = await fetch('/fullscreen-textured-quad.wgsl')
     .then(response => response.text());
+  
+  const gltf = await fetch('/suz-cube.gltf')
+    .then(response => response.json());
+
+  console.log(gltf);
 
   //// CANVAS SETUP ////
   const presentationFormat = context.getPreferredFormat(adapter);
@@ -210,7 +216,7 @@ async function start() {
   });
   const renderUniformArray = new Float32Array(renderUniformBuffer.getMappedRange());
   renderUniformArray.set([
-    8.0,
+    0.5,
   ]);
   renderUniformBuffer.unmap();
 
