@@ -3,9 +3,11 @@ import Camera from './camera';
 import Sphere, {spheres} from './spheres';
 
 //// CONSTANTS AND INIT ////
-const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
 let timestep = 1;
 let keys: Record<string, boolean> = {};
+let computeTexture: GPUTexture;
+let computeCopyTexture: GPUTexture;
+let camera: Camera;
 start();
 
 async function start() {
@@ -42,6 +44,8 @@ async function start() {
 
   function configureCanvasSize () {
     if (!canvas || !context) return;
+
+    timestep = 1;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     const devicePixelRatio = window.devicePixelRatio || 1;
@@ -56,11 +60,35 @@ async function start() {
       size: presentationSize,
       compositingAlphaMode: "premultiplied"
     });
+
+    if (computeTexture) {
+      computeTexture = device.createTexture({
+        size: presentationSize,
+        format: 'rgba16float',
+        usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.COPY_SRC
+      });
+    
+      computeCopyTexture = device.createTexture({
+        size: presentationSize,
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
+      });
+    }
+
+    if (camera) {
+      camera.width = presentationSize[0];
+      camera.height = presentationSize[1];
+      camera.updateMatrices();
+      camera.updateBuffer(device);
+    }
   }
 
   configureCanvasSize();
-  // todo handle resizing
-  // window.addEventListener('resize', configureCanvasSize);
+
+  window.addEventListener('resize', configureCanvasSize);
 
   //// PIPELINE AND BIND GROUP LAYOUT SETUP ////
   const computeBindGroupLayout = device.createBindGroupLayout({
@@ -174,7 +202,7 @@ async function start() {
     minFilter: 'nearest',
   });
 
-  const computeTexture = device.createTexture({
+  computeTexture = device.createTexture({
     size: presentationSize,
     format: 'rgba16float',
     usage:
@@ -183,14 +211,14 @@ async function start() {
     GPUTextureUsage.COPY_SRC
   });
 
-  const computeCopyTexture = device.createTexture({
+  computeCopyTexture = device.createTexture({
     size: presentationSize,
     format: 'rgba16float',
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
   });
 
   //// CAMERA SETUP ////
-  const camera = new Camera({
+  camera = new Camera({
     position: vec3.fromValues(-6, 0, 6),
     width: presentationSize[0],
     height: presentationSize[1]
@@ -219,57 +247,6 @@ async function start() {
     0.5,
   ]);
   renderUniformBuffer.unmap();
-
-  //// PIPELINE BIND GROUPS ////
-  const computeBindGroup = device.createBindGroup({
-    layout: computeBindGroupLayout,
-    entries: [
-      {
-        binding: 0,
-        resource: {
-          buffer: camera.buffer as GPUBuffer,
-        },
-      },
-      {
-        binding: 1,
-        resource: {
-          buffer: sphereBuffer,
-        }
-      },
-      {
-        binding: 2,
-        resource: sampler,
-      },
-      {
-        binding: 3,
-        resource: computeCopyTexture.createView(),
-      },
-      {
-        binding: 4,
-        resource: computeTexture.createView(),
-      },
-    ],
-  });
-
-  const renderBindGroup = device.createBindGroup({
-    layout: renderBindGroupLayout,
-    entries: [
-      {
-        binding: 0,
-        resource: sampler,
-      },
-      {
-        binding: 1,
-        resource: computeTexture.createView(),
-      },
-      {
-        binding: 2,
-        resource: {
-          buffer: renderUniformBuffer,
-        },
-      },
-    ],
-  });
 
   //// EVENT LISTENERS ////
   window.addEventListener('keydown', (e) => {
@@ -341,7 +318,35 @@ async function start() {
     // start pass
     const computePass = commandEncoder.beginComputePass();
     computePass.setPipeline(computePipeline);
-    computePass.setBindGroup(0, computeBindGroup);
+    computePass.setBindGroup(0, device.createBindGroup({
+      layout: computeBindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: camera.buffer as GPUBuffer,
+          },
+        },
+        {
+          binding: 1,
+          resource: {
+            buffer: sphereBuffer,
+          }
+        },
+        {
+          binding: 2,
+          resource: sampler,
+        },
+        {
+          binding: 3,
+          resource: computeCopyTexture.createView(),
+        },
+        {
+          binding: 4,
+          resource: computeTexture.createView(),
+        },
+      ],
+    }));
     // workgroup sizes are 16x16 right now
     computePass.dispatch(
       Math.ceil(presentationSize[0] / 16),
@@ -373,7 +378,27 @@ async function start() {
       ],
     });
     renderPass.setPipeline(renderPipeline);
-    renderPass.setBindGroup(0, renderBindGroup);
+
+    // todo memoize bind groups somehow
+    renderPass.setBindGroup(0, device.createBindGroup({
+      layout: renderBindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: sampler,
+        },
+        {
+          binding: 1,
+          resource: computeTexture.createView(),
+        },
+        {
+          binding: 2,
+          resource: {
+            buffer: renderUniformBuffer,
+          },
+        },
+      ],
+    }));
     renderPass.draw(6, 1, 0, 0);
     renderPass.end();
 
