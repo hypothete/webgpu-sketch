@@ -28,6 +28,14 @@
   resolved "https://registry.yarnpkg.com/@gar/promisify/-/promisify-1.1.3.tgz#555193ab2e3bb3b6adc3d551c9c030d9e860daf6"
   integrity sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==
 
+"@gltf-transform/core@^2.0.5":
+  version "2.0.5"
+  resolved "https://registry.yarnpkg.com/@gltf-transform/core/-/core-2.0.5.tgz#4767de8eb6a5788d9058ca5eb97f7e69af260061"
+  integrity sha512-ZJvkcwjQmC5Lnh62liCDDgNShEwRjXLHYmrTt2zVxeT7KUj9FMSPEr+favGZr4nXykGOeJF9YQ6a6QTwQ8F8eQ==
+  dependencies:
+    gl-matrix "~3.4.3"
+    property-graph "^0.2.6"
+
 "@isaacs/string-locale-compare@^1.0.1":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@isaacs/string-locale-compare/-/string-locale-compare-1.1.0.tgz#291c227e93fd407a96ecd59879a35809120e432b"
@@ -1148,7 +1156,7 @@ getpass@^0.1.1:
   dependencies:
     assert-plus "^1.0.0"
 
-gl-matrix@3.4.3:
+gl-matrix@3.4.3, gl-matrix@~3.4.3:
   version "3.4.3"
   resolved "https://registry.yarnpkg.com/gl-matrix/-/gl-matrix-3.4.3.tgz#fc1191e8320009fd4d20e9339595c6041ddc22c9"
   integrity sha512-wcCp8vu8FT22BnvKVPjXa/ICBWRq/zjFfdofZy1WSpQZpphblv12/bOQLBC1rMM7SGOFS9ltVmKOHil5+Ml7gA==
@@ -2239,6 +2247,11 @@ promise-retry@^2.0.1:
   dependencies:
     err-code "^2.0.2"
     retry "^0.12.0"
+
+property-graph@^0.2.6:
+  version "0.2.6"
+  resolved "https://registry.yarnpkg.com/property-graph/-/property-graph-0.2.6.tgz#add988a436745936d4b2ae19f747f2556296c828"
+  integrity sha512-QiBHxNZlwIarbkxsqCY688aP1ANbwtoQFBYgTZopQ0Bvku6/EYp3H4KH0ygxkhWQbJv5DEONspLy1rHi5xIycg==
 
 psl@^1.1.28:
   version "1.8.0"

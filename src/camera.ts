@@ -1,6 +1,5 @@
 import { mat4, vec3 } from 'gl-matrix';
-
-const vec4Size = 4 * Float32Array.BYTES_PER_ELEMENT;
+import { vec4Size } from './generic';
 
 interface CameraOptions {
   position: vec3;

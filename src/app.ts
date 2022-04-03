@@ -1,6 +1,10 @@
 import { vec3, mat4 } from 'gl-matrix';
+import { Accessor, WebIO } from '@gltf-transform/core';
+
 import Camera from './camera';
-import Sphere, {spheres} from './spheres';
+import Material, { materials } from './materials';
+import Sphere, { spheres } from './spheres';
+import { makeVec4ArrayFromAccessor, vec4Size } from './generic';
 
 //// CONSTANTS AND INIT ////
 let timestep = 1;
@@ -33,10 +37,8 @@ async function start() {
   const fullscreenTexturedQuadWGSL = await fetch('/fullscreen-textured-quad.wgsl')
     .then(response => response.text());
   
-  const gltf = await fetch('/suz-cube.gltf')
-    .then(response => response.json());
-
-  console.log(gltf);
+  const io = new WebIO({credentials: 'include'});
+  const gltfDoc = await io.read('/suz-cube.gltf');
 
   //// CANVAS SETUP ////
   const presentationFormat = context.getPreferredFormat(adapter);
@@ -110,19 +112,33 @@ async function start() {
       {
         binding: 2,
         visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'read-only-storage'
+        }
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'read-only-storage'
+        }
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
         sampler: {
           type: 'filtering'
         }
       },
       {
-        binding: 3,
+        binding: 5,
         visibility: GPUShaderStage.COMPUTE,
         texture: {
           sampleType: 'float'
         }
       },
       {
-        binding: 4,
+        binding: 6,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: {
           format: 'rgba16float',
@@ -236,9 +252,37 @@ async function start() {
   sphereArray.set(sphereData);
   sphereBuffer.unmap();
 
+  //// VERTEX ARRAY ////
+  const meshes = gltfDoc.getRoot().listMeshes();
+  const primitives = meshes.flatMap(mesh => mesh.listPrimitives());
+  let meshAccessors = primitives.map(primitive => primitive.getAttribute('POSITION'))
+  .filter((attrs): attrs is Accessor => attrs !== null);
+
+  const triData = makeVec4ArrayFromAccessor(meshAccessors[0]);
+
+  const triBuffer = device.createBuffer({
+    size: triData.byteLength,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
+  });
+  const triArray = new Float32Array(triBuffer.getMappedRange());
+  triArray.set(triData);
+  triBuffer.unmap();
+
+  //// MATERIAL ARRAY ////
+  const materialData = materials.flatMap(material => material.toArray());
+  const materialBuffer = device.createBuffer({
+    size: materials.length * Material.size,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
+  });
+  const materialArray = new Float32Array(materialBuffer.getMappedRange());
+  materialArray.set(materialData);
+  materialBuffer.unmap();
+
   //// RENDER UNIFORMS ////
   const renderUniformBuffer = device.createBuffer({
-    size: spheres.length * Sphere.size,
+    size: vec4Size,
     usage: GPUBufferUsage.UNIFORM,
     mappedAtCreation: true
   });
@@ -335,14 +379,26 @@ async function start() {
         },
         {
           binding: 2,
-          resource: sampler,
+          resource: {
+            buffer: triBuffer,
+          }
         },
         {
           binding: 3,
-          resource: computeCopyTexture.createView(),
+          resource: {
+            buffer: materialBuffer,
+          }
         },
         {
           binding: 4,
+          resource: sampler,
+        },
+        {
+          binding: 5,
+          resource: computeCopyTexture.createView(),
+        },
+        {
+          binding: 6,
           resource: computeTexture.createView(),
         },
       ],

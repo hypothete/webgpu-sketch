@@ -10,15 +10,21 @@ struct Uniforms {
 struct Sphere {
   position: vec3<f32>;
   radius: f32;
-  diffuse: vec3<f32>;
-  roughness: f32;
-  emissive: vec3<f32>;
+  material: f32;
 }
 
 struct Triangle {
   a: vec3<f32>;
   b: vec3<f32>;
   c: vec3<f32>;
+}
+
+struct Material {
+  diffuse: vec3<f32>;
+  roughness: f32;
+  specular: vec3<f32>;
+  metalness: f32;
+  emissive: vec3<f32>;
 }
 
 struct Ray {
@@ -29,13 +35,16 @@ struct Ray {
 struct Info {
   lengths: vec2<f32>;
   normal: vec3<f32>;
+  material: u32;
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
-@group(0) @binding(2) var mySampler : sampler;
-@group(0) @binding(3) var computeCopyTexture : texture_2d<f32>;
-@group(0) @binding(4) var outputTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(2) var<storage> triangles: array<Triangle>;
+@group(0) @binding(3) var<storage> materials: array<Material>;
+@group(0) @binding(4) var mySampler : sampler;
+@group(0) @binding(5) var computeCopyTexture : texture_2d<f32>;
+@group(0) @binding(6) var outputTex: texture_storage_2d<rgba16float, write>;
 
 let PI: f32 = 3.141592653589;
 let EPSILON: f32 = 0.001;
@@ -111,10 +120,16 @@ fn sphereNormal(s: Sphere, p: vec3<f32>) -> vec3<f32> {
   return normalize(p - s.position);
 }
 
-fn intersectSpheres(r: Ray,  info: ptr<function,Info>) -> Sphere  {
+fn triangleNormal(t: Triangle) -> vec3<f32> {
+  let edge1 = t.b - t.a;
+  let edge2 = t.c - t.a;
+  let h = cross(edge1, edge2);
+  return normalize(h);
+}
+
+fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
   let numSpheres = arrayLength(&spheres);
   var i: u32 = 0u;
-  var closestSphere: Sphere;
   loop {
     if (i >= numSpheres) {
       break;
@@ -125,11 +140,27 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>) -> Sphere  {
       sphereIntersections.x < (*info).lengths.x) {
         (*info).lengths.x = sphereIntersections.x;
         (*info).normal = sphereNormal(spheres[i], rayAt(r, sphereIntersections.x));
-        closestSphere = spheres[i];
+        (*info).material = u32(spheres[i].material); // todo why can't it assign properly?
     }
     i = i + 1u;
   }
-  return closestSphere;
+}
+
+fn intersectTriangles(r: Ray,  info: ptr<function,Info>)  {
+  let numTris = arrayLength(&triangles);
+  var i: u32 = 0u;
+  loop {
+    if (i >= numTris) {
+      break;
+    }
+    let triIntersection = intersectTriangle(r, triangles[i]);
+    if (triIntersection > uniforms.near && triIntersection < (*info).lengths.x) {
+        (*info).lengths.x = triIntersection;
+        (*info).normal = triangleNormal(triangles[i]);
+        (*info).material = 1u; // todo assign materials to meshes
+    }
+    i = i + 1u;
+  }
 }
 
 fn fresnelReflectAmount (n1: f32, n2: f32, normal: vec3<f32>, incident: vec3<f32>, reflectivity: f32) -> f32 {
@@ -164,9 +195,11 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     }
     var info: Info = Info(
       vec2<f32>(uniforms.far, uniforms.near),
-      vec3(0.0)
+      vec3(0.0),
+      0u
     );
-    let closestSphere = intersectSpheres(*r, &info);
+    // intersectSpheres(*r, &info);
+    intersectTriangles(*r, &info);
     if (info.lengths.x >= uniforms.far) {
       col = col + SKY_COLOR * throughput;
       break;
@@ -177,14 +210,16 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
     let hit = rayAt(*r, info.lengths.x);
     let diffuseDir = normalize(info.normal + randomUnitVector());
     let specularDir = reflect((*r).direction, info.normal);
-    let fresnel = fresnelReflectAmount(1.0, 1.5, info.normal, (*r).direction, 1.0 - closestSphere.roughness);
-    (*r).direction = normalize(mix(diffuseDir, specularDir, max(doSpecular, fresnel) - closestSphere.roughness));
+    let closestMaterial = materials[info.material];
+
+    let fresnel = fresnelReflectAmount(1.0, 1.5, info.normal, (*r).direction, 1.0 - closestMaterial.roughness);
+    (*r).direction = normalize(mix(diffuseDir, specularDir, max(doSpecular, fresnel) - closestMaterial.roughness));
     (*r).origin = hit + (*r).direction * EPSILON;
 
     // add color
-    col = col + closestSphere.emissive * throughput;
-    throughput = throughput * closestSphere.diffuse;
-    // todo add specular color to sphere
+    col = col + closestMaterial.emissive * throughput;
+    throughput = throughput * closestMaterial.diffuse;
+    // todo add specular color
     i = i - 1u;
   }
   return vec4<f32>(col, 1.0);
