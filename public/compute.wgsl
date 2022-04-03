@@ -1,41 +1,41 @@
 struct Uniforms {
-  iViewMatrix: mat4x4<f32>;
-  iProjectionMatrix: mat4x4<f32>;
-  resolution: vec2<f32>;
-  near: f32;
-  far: f32;
-  timestep: f32;
+  iViewMatrix: mat4x4<f32>,
+  iProjectionMatrix: mat4x4<f32>,
+  resolution: vec2<f32>,
+  near: f32,
+  far: f32,
+  timestep: f32,
 }
 
 struct Sphere {
-  position: vec3<f32>;
-  radius: f32;
-  material: f32;
+  position: vec3<f32>,
+  radius: f32,
+  material: f32,
 }
 
 struct Triangle {
-  a: vec3<f32>;
-  b: vec3<f32>;
-  c: vec3<f32>;
+  a: vec3<f32>,
+  b: vec3<f32>,
+  c: vec3<f32>,
 }
 
 struct Material {
-  diffuse: vec3<f32>;
-  roughness: f32;
-  specular: vec3<f32>;
-  metalness: f32;
-  emissive: vec3<f32>;
+  diffuse: vec3<f32>,
+  roughness: f32,
+  specular: vec3<f32>,
+  metalness: f32,
+  emissive: vec3<f32>,
 }
 
 struct Ray {
-  origin: vec3<f32>;
-  direction: vec3<f32>;
+  origin: vec3<f32>,
+  direction: vec3<f32>,
 }
 
 struct Info {
-  lengths: vec2<f32>;
-  normal: vec3<f32>;
-  material: u32;
+  lengths: vec2<f32>,
+  normal: vec3<f32>,
+  material: u32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -198,7 +198,7 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
       vec3(0.0),
       0u
     );
-    // intersectSpheres(*r, &info);
+    intersectSpheres(*r, &info);
     intersectTriangles(*r, &info);
     if (info.lengths.x >= uniforms.far) {
       col = col + SKY_COLOR * throughput;

@@ -3,12 +3,12 @@
 @group(0) @binding(2) var<uniform> uniforms: Uniforms;
 
 struct VertexOutput {
-  @builtin(position) Position : vec4<f32>;
-  @location(0) fragUV : vec2<f32>;
+  @builtin(position) Position : vec4<f32>,
+  @location(0) fragUV : vec2<f32>,
 };
 
 struct Uniforms {
-  exposure: f32;
+  exposure: f32,
 }
 
 fn ACESFilm(x: vec3<f32>) -> vec3<f32> {

@@ -38,11 +38,11 @@ export const spheres = [
   }),
 
   // red
-  new Sphere({
-    position: vec3.fromValues(-0.2, 0, 0),
-    radius: 0.4,
-    material: 1,
-  }),
+  // new Sphere({
+  //   position: vec3.fromValues(-0.2, 0, 0),
+  //   radius: 0.4,
+  //   material: 1,
+  // }),
 
   // reflective
   new Sphere({

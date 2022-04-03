@@ -1,4 +1,4 @@
-import { vec3, mat4 } from 'gl-matrix';
+import { vec3, vec4, mat4 } from 'gl-matrix';
 import { Accessor, WebIO } from '@gltf-transform/core';
 
 import Camera from './camera';
@@ -38,7 +38,7 @@ async function start() {
     .then(response => response.text());
   
   const io = new WebIO({credentials: 'include'});
-  const gltfDoc = await io.read('/suz-cube.gltf');
+  const gltfDoc = await io.read('/cube.glb');
 
   //// CANVAS SETUP ////
   const presentationFormat = context.getPreferredFormat(adapter);
@@ -253,13 +253,45 @@ async function start() {
   sphereBuffer.unmap();
 
   //// VERTEX ARRAY ////
+  const nodes = gltfDoc.getRoot().listNodes();
   const meshes = gltfDoc.getRoot().listMeshes();
   const primitives = meshes.flatMap(mesh => mesh.listPrimitives());
-  let meshAccessors = primitives.map(primitive => primitive.getAttribute('POSITION'))
-  .filter((attrs): attrs is Accessor => attrs !== null);
+  let triRaw: number[] = [];
 
-  const triData = makeVec4ArrayFromAccessor(meshAccessors[0]);
+  nodes.forEach(node => {
+    const meshTransform = node.getMatrix();
+    const mesh = node.getMesh();
+    if (!mesh) return;
+    const primitives = mesh.listPrimitives();
+    primitives.forEach(primitive => {
+      const indices = primitive.getIndices();
+      const positions = primitive.getAttribute('POSITION');
+      if (indices && positions) {
+        const indexArray = indices.getArray();
+        indexArray?.forEach(index => {
+          const tfdPosition = vec4.fromValues(
+            ...positions.getElement(index, []) as [number, number, number],
+            1
+          );
+          vec4.transformMat4(tfdPosition, tfdPosition, meshTransform);
+          triRaw.push(...positions.getElement(index, []), 0);
+        })
+      }
+    });
+  });
 
+  primitives.forEach(primitive => {
+    const indices = primitive.getIndices();
+    const positions = primitive.getAttribute('POSITION');
+    if (indices && positions) {
+      const indexArray = indices.getArray();
+      indexArray?.forEach(index => {
+        triRaw.push(...positions.getElement(index, []), 0);
+      })
+    }
+  });
+
+  const triData = Float32Array.from(triRaw);
   const triBuffer = device.createBuffer({
     size: triData.byteLength,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
