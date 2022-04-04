@@ -1,7 +1,7 @@
 # WebGPU Sketch
 Working on a raytracer using WebGPU.
 
-![A screenshot of a raytraced scene](./4-3-2022-glb-read.png)
+![A screenshot of a raytraced scene](./suzanne-backface.png)
 
 Based on code from these sources:
 * https://surma.dev/things/webgpu/ 
