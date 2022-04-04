@@ -250,7 +250,7 @@ async function start() {
   sphereBuffer.unmap();
 
   //// VERTEX ARRAY ////
-  const triData = camera.cullGLTFDocument(gltfDoc);
+  const triData = camera.parseGLTFDocument(gltfDoc);
   const triBuffer = device.createBuffer({
     size: triData.byteLength,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,

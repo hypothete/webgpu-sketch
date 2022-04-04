@@ -96,7 +96,7 @@ class Camera {
     device.queue.writeBuffer(this.buffer as GPUBuffer, vec4Size * 9, tsBuffer);
   }
 
-  cullGLTFDocument(gltfDoc: Document): Float32Array {
+  parseGLTFDocument(gltfDoc: Document): Float32Array {
     const nodes = gltfDoc.getRoot().listNodes();
     const triRaw: number[] = [];
     nodes.forEach(node => {
