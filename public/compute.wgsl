@@ -1,10 +1,11 @@
-struct Uniforms {
+struct Camera {
   iViewMatrix: mat4x4<f32>,
   iProjectionMatrix: mat4x4<f32>,
   resolution: vec2<f32>,
   near: f32,
   far: f32,
   timestep: f32,
+  triangleCount: f32,
 }
 
 struct Sphere {
@@ -38,7 +39,7 @@ struct Info {
   material: u32,
 }
 
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+@group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var<storage> triangles: array<Triangle>;
 @group(0) @binding(3) var<storage> materials: array<Material>;
@@ -49,7 +50,7 @@ struct Info {
 let PI: f32 = 3.141592653589;
 let EPSILON: f32 = 0.001;
 let RAY_BOUNCES: u32 = 4u;
-let SAMPLES: u32 = 8u;
+let SAMPLES: u32 = 1u;
 let SKY_COLOR: vec3<f32> = vec3<f32>(0.6, 0.65, 0.8);
 
 var<private> RNGSTATE: u32 = 42u;
@@ -135,7 +136,7 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
       break;
     }
     let sphereIntersections = intersectSphere(r, spheres[i]);
-    if (sphereIntersections.x > uniforms.near &&
+    if (sphereIntersections.x > camera.near &&
       sphereIntersections.x < sphereIntersections.y &&
       sphereIntersections.x < (*info).lengths.x) {
         (*info).lengths.x = sphereIntersections.x;
@@ -147,14 +148,13 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
 }
 
 fn intersectTriangles(r: Ray,  info: ptr<function,Info>)  {
-  let numTris = arrayLength(&triangles);
   var i: u32 = 0u;
   loop {
-    if (i >= numTris) {
+    if (i >= u32(camera.triangleCount)) {
       break;
     }
     let triIntersection = intersectTriangle(r, triangles[i]);
-    if (triIntersection > uniforms.near && triIntersection < (*info).lengths.x) {
+    if (triIntersection > camera.near && triIntersection < (*info).lengths.x) {
         (*info).lengths.x = triIntersection;
         (*info).normal = triangleNormal(triangles[i]);
         (*info).material = 1u; // todo assign materials to meshes
@@ -194,13 +194,13 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
       break;
     }
     var info: Info = Info(
-      vec2<f32>(uniforms.far, uniforms.near),
+      vec2<f32>(camera.far, camera.near),
       vec3(0.0),
       0u
     );
     intersectSpheres(*r, &info);
     intersectTriangles(*r, &info);
-    if (info.lengths.x >= uniforms.far) {
+    if (info.lengths.x >= camera.far) {
       col = col + SKY_COLOR * throughput;
       break;
     }
@@ -234,13 +234,13 @@ fn main(
 
   let x = f32(global_id.x);
   let y = f32(global_id.y);
-  RNGSTATE = u32(uniforms.timestep * x * y);
-  let aspect = uniforms.resolution.y / uniforms.resolution.x;
+  RNGSTATE = u32(camera.timestep * x * y);
+  let aspect = camera.resolution.y / camera.resolution.x;
   let uv = vec2<f32>(
-    (x / uniforms.resolution.x),
-    (y / uniforms.resolution.y)
+    (x / camera.resolution.x),
+    (y / camera.resolution.y)
   );
-  let camPosition = uniforms.iViewMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0);
+  let camPosition = camera.iViewMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
   var col1 = vec4<f32>();
 
@@ -250,9 +250,9 @@ fn main(
       break;
     }
     let jitter = vec2<f32>(randomFloat(), randomFloat()) - 0.5;
-    var rayDirection = uniforms.iViewMatrix * (uniforms.iProjectionMatrix * vec4<f32>(
-      (2.0 * (jitter.x + x) / uniforms.resolution.x) - 1.0,
-      (1.0 - 2.0 * (jitter.y + y) / uniforms.resolution.y),
+    var rayDirection = camera.iViewMatrix * (camera.iProjectionMatrix * vec4<f32>(
+      (2.0 * (jitter.x + x) / camera.resolution.x) - 1.0,
+      (1.0 - 2.0 * (jitter.y + y) / camera.resolution.y),
       1.0,
       1.0
     ));
@@ -270,7 +270,7 @@ fn main(
   col1 = vec4<f32>(col1.rgb / f32(SAMPLES), 1.0);
 
   let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
-  let col3 = mix(col1, col2, 1.0 - 1.0 / uniforms.timestep);
+  let col3 = mix(col1, col2, 1.0 - 1.0 / camera.timestep);
 
   textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
 }

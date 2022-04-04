@@ -32,7 +32,7 @@ class Sphere {
 export const spheres = [
   // blue
   new Sphere({
-    position: vec3.fromValues(-4, 0, 0),
+    position: vec3.fromValues(-4, 0, -2),
     radius: 0.8,
     material: 0
   }),
@@ -46,7 +46,7 @@ export const spheres = [
 
   // reflective
   new Sphere({
-    position: vec3.fromValues(3, 0, 0),
+    position: vec3.fromValues(6, 0, 0),
     radius: 1.5,
     material: 2,
   }),
@@ -54,14 +54,14 @@ export const spheres = [
   // ground
   new Sphere({
     position: vec3.fromValues(0, -500, 0),
-    radius: 498,
+    radius: 499,
     material: 3,
   }),
 
   // lights
   new Sphere({
-    position: vec3.fromValues(-0, 2, 0),
-    radius: 0.7,
+    position: vec3.fromValues(-0, 6, 0),
+    radius: 1.7,
     material: 4,
   }),
   new Sphere({

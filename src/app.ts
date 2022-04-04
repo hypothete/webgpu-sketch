@@ -1,17 +1,16 @@
 import { vec3, vec4, mat4 } from 'gl-matrix';
-import { Accessor, WebIO } from '@gltf-transform/core';
+import { WebIO } from '@gltf-transform/core';
 
 import Camera from './camera';
 import Material, { materials } from './materials';
 import Sphere, { spheres } from './spheres';
-import { makeVec4ArrayFromAccessor, vec4Size } from './generic';
+import { vec4Size } from './generic';
 
 //// CONSTANTS AND INIT ////
-let timestep = 1;
 let keys: Record<string, boolean> = {};
-let computeTexture: GPUTexture;
-let computeCopyTexture: GPUTexture;
-let camera: Camera;
+let computeTexture: GPUTexture | undefined;
+let computeCopyTexture: GPUTexture | undefined;
+let camera: Camera | undefined;
 start();
 
 async function start() {
@@ -38,7 +37,7 @@ async function start() {
     .then(response => response.text());
   
   const io = new WebIO({credentials: 'include'});
-  const gltfDoc = await io.read('/cube.glb');
+  const gltfDoc = await io.read('/suz-cube.gltf');
 
   //// CANVAS SETUP ////
   const presentationFormat = context.getPreferredFormat(adapter);
@@ -46,8 +45,6 @@ async function start() {
 
   function configureCanvasSize () {
     if (!canvas || !context) return;
-
-    timestep = 1;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     const devicePixelRatio = window.devicePixelRatio || 1;
@@ -253,53 +250,16 @@ async function start() {
   sphereBuffer.unmap();
 
   //// VERTEX ARRAY ////
-  const nodes = gltfDoc.getRoot().listNodes();
-  const meshes = gltfDoc.getRoot().listMeshes();
-  const primitives = meshes.flatMap(mesh => mesh.listPrimitives());
-  let triRaw: number[] = [];
-
-  nodes.forEach(node => {
-    const meshTransform = node.getMatrix();
-    const mesh = node.getMesh();
-    if (!mesh) return;
-    const primitives = mesh.listPrimitives();
-    primitives.forEach(primitive => {
-      const indices = primitive.getIndices();
-      const positions = primitive.getAttribute('POSITION');
-      if (indices && positions) {
-        const indexArray = indices.getArray();
-        indexArray?.forEach(index => {
-          const tfdPosition = vec4.fromValues(
-            ...positions.getElement(index, []) as [number, number, number],
-            1
-          );
-          vec4.transformMat4(tfdPosition, tfdPosition, meshTransform);
-          triRaw.push(...positions.getElement(index, []), 0);
-        })
-      }
-    });
-  });
-
-  primitives.forEach(primitive => {
-    const indices = primitive.getIndices();
-    const positions = primitive.getAttribute('POSITION');
-    if (indices && positions) {
-      const indexArray = indices.getArray();
-      indexArray?.forEach(index => {
-        triRaw.push(...positions.getElement(index, []), 0);
-      })
-    }
-  });
-
-  const triData = Float32Array.from(triRaw);
+  const triData = camera.cullGLTFDocument(gltfDoc);
   const triBuffer = device.createBuffer({
-    size: triData.byteLength,
+    size: vec4Size * camera.maxTriangleCount * 3,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     mappedAtCreation: true
   });
   const triArray = new Float32Array(triBuffer.getMappedRange());
   triArray.set(triData);
   triBuffer.unmap();
+  camera.updateBuffer(device);
 
   //// MATERIAL ARRAY ////
   const materialData = materials.flatMap(material => material.toArray());
@@ -338,6 +298,8 @@ async function start() {
 
   function frame () {
     if (!canvas || !context) throw Error("Lost rendering context!");
+    if (!camera) throw Error("Camera not instantiated.");
+    if (!computeTexture || !computeCopyTexture) throw Error("Compute textures not instantiated.");
     const commandEncoder = device.createCommandEncoder();
     //// EVENT HANDLING ////
     let dirty = false;
@@ -370,7 +332,7 @@ async function start() {
     }
 
     if (dirty) {
-      timestep = 1;
+      camera.timestep = 1;
       const rotYMat = mat4.create();
       mat4.fromRotation(rotYMat, 0.02 * rotY, camera.up);
       vec3.transformMat4(camera.position, camera.position, rotYMat);
@@ -386,11 +348,13 @@ async function start() {
       vec3.scale(camera.position, camera.position, 1 + zoom * 0.02);
 
       camera.updateMatrices();
+      const triData = camera.cullGLTFDocument(gltfDoc);
+      device.queue.writeBuffer(triBuffer, 0, triData);
       camera.updateBuffer(device);
     }
 
     //// COMPUTE PASS ////
-    camera.updateTimestep(device, timestep);
+    camera.updateTimestep(device);
     // start pass
     const computePass = commandEncoder.beginComputePass();
     computePass.setPipeline(computePipeline);
@@ -491,7 +455,7 @@ async function start() {
     renderPass.end();
 
     device.queue.submit([commandEncoder.finish()]);
-    timestep += 1;
+    camera.timestep += 1;
     requestAnimationFrame(frame);
   }
 }
