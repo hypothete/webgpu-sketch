@@ -4,8 +4,7 @@ struct Camera {
   resolution: vec2<f32>,
   near: f32,
   far: f32,
-  timestep: f32,
-  triangleCount: f32,
+  timestep: f32
 }
 
 struct Sphere {
@@ -150,7 +149,7 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
 fn intersectTriangles(r: Ray,  info: ptr<function,Info>)  {
   var i: u32 = 0u;
   loop {
-    if (i >= u32(camera.triangleCount)) {
+    if (i >= arrayLength(&triangles)) {
       break;
     }
     let triIntersection = intersectTriangle(r, triangles[i]);

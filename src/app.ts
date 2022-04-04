@@ -252,7 +252,7 @@ async function start() {
   //// VERTEX ARRAY ////
   const triData = camera.cullGLTFDocument(gltfDoc);
   const triBuffer = device.createBuffer({
-    size: vec4Size * camera.maxTriangleCount * 3,
+    size: triData.byteLength,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     mappedAtCreation: true
   });
@@ -336,7 +336,6 @@ async function start() {
       const rotYMat = mat4.create();
       mat4.fromRotation(rotYMat, 0.02 * rotY, camera.up);
       vec3.transformMat4(camera.position, camera.position, rotYMat);
-
       const rotXMat = mat4.create();
       const xOrtho = vec3.create();
       const toTarget = vec3.create();
@@ -344,12 +343,8 @@ async function start() {
       vec3.cross(xOrtho, toTarget, camera.up);
       mat4.fromRotation(rotXMat, 0.02 * rotX, xOrtho);
       vec3.transformMat4(camera.position, camera.position, rotXMat);
-
       vec3.scale(camera.position, camera.position, 1 + zoom * 0.02);
-
       camera.updateMatrices();
-      const triData = camera.cullGLTFDocument(gltfDoc);
-      device.queue.writeBuffer(triBuffer, 0, triData);
       camera.updateBuffer(device);
     }
 

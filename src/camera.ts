@@ -29,8 +29,6 @@ class Camera {
   far: number = 100;
   buffer?: GPUBuffer;
   timestep: number = 1;
-  maxTriangleCount: number = -1;
-  triangleCount: number = -1;
 
   constructor(options: Partial<CameraOptions>) {
     Object.assign(this, options);
@@ -68,7 +66,6 @@ class Camera {
       this.width, this.height,
       this.near, this.far,
       this.timestep,
-      this.triangleCount,
     ]);
     device.queue.writeBuffer(
       this.buffer,
@@ -90,7 +87,6 @@ class Camera {
       this.width, this.height,
       this.near, this.far,
       this.timestep,
-      this.triangleCount
     ]);
     this.buffer.unmap();
   }
@@ -103,9 +99,6 @@ class Camera {
   cullGLTFDocument(gltfDoc: Document): Float32Array {
     const nodes = gltfDoc.getRoot().listNodes();
     const triRaw: number[] = [];
-    this.maxTriangleCount = 0;
-    this.triangleCount = 0;
-
     nodes.forEach(node => {
       const meshTransform = node.getMatrix();
       const mesh = node.getMesh();
@@ -118,50 +111,14 @@ class Camera {
           const indexArray = indices.getArray();
           if (!indexArray) return;
           // iterate over triangles, cull & add to buffer
-          for(let i = 0; i < indexArray?.length; i += 3) {
-
+          for(let i = 0; i < indexArray?.length; i ++) {
             const aPosition = vec4.fromValues(
               ...positions.getElement(indexArray[i], []) as [number, number, number],
               1
             );
-            const bPosition = vec4.fromValues(
-              ...positions.getElement(indexArray[i + 1], []) as [number, number, number],
-              1
-            );
-            const cPosition = vec4.fromValues(
-              ...positions.getElement(indexArray[i + 2], []) as [number, number, number],
-              1
-            );
+
             vec4.transformMat4(aPosition, aPosition, meshTransform);
-            vec4.transformMat4(bPosition, bPosition, meshTransform);
-            vec4.transformMat4(cPosition, cPosition, meshTransform);
-
-            const aXYZ = vec3.fromValues(aPosition[0], aPosition[1], aPosition[2]);
-            const bXYZ = vec3.fromValues(bPosition[0], bPosition[1], bPosition[2]);
-            const cXYZ = vec3.fromValues(cPosition[0], cPosition[1], cPosition[2]);
-            
-            const edge1 = vec3.subtract(vec3.create(), bXYZ, aXYZ);
-            const edge2 = vec3.subtract(vec3.create(), cXYZ, aXYZ);
-            const triNormal = vec3.cross(vec3.create(), edge1, edge2);
-            vec3.normalize(triNormal, triNormal);
-
-            // add triangle count
-            this.maxTriangleCount++;
-            
-            const camDot = vec3.dot(this.direction, triNormal);
-
-            if (camDot > 0) {
-              // normal of triangle does not face camera
-              continue;
-            }
-
-            triRaw.push(
-              ...aPosition,
-              ...bPosition,
-              ...cPosition
-            );
-
-            this.triangleCount++;
+            triRaw.push(...aPosition);
           }
         }
       });
