@@ -80,6 +80,7 @@ async function start() {
     if (camera) {
       camera.width = presentationSize[0];
       camera.height = presentationSize[1];
+      camera.timestep = 1;
       camera.updateMatrices();
       camera.updateBuffer(device);
     }
