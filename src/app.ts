@@ -258,6 +258,8 @@ async function start() {
     usage: GPUBufferUsage.STORAGE,
     mappedAtCreation: true
   });
+  const pointsArray = new Float32Array(pointsBuffer.getMappedRange());
+  pointsArray.fill(0);
   pointsBuffer.unmap();
 
   //// TEXTURE SETUP ////
@@ -439,13 +441,12 @@ async function start() {
         },
       ],
     }));
-    computePass.dispatch(POINTS_COUNT, 1, 1);
-    computePass.end();
+    computePass.dispatch(1, 1, 1);
 
     //// VORONOI PASS ////
-    const voronoiPass = commandEncoder.beginComputePass();
-    voronoiPass.setPipeline(voronoiPipeline);
-    voronoiPass.setBindGroup(0, device.createBindGroup({
+
+    computePass.setPipeline(voronoiPipeline);
+    computePass.setBindGroup(0, device.createBindGroup({
       layout: voronoiBindGroupLayout,
       entries: [
         {
@@ -474,12 +475,12 @@ async function start() {
         },
       ],
     }));
-    voronoiPass.dispatch(
+    computePass.dispatch(
       Math.ceil(presentationSize[0] / 16),
       Math.ceil(presentationSize[1] / 16),
       1
     );
-    voronoiPass.end();
+    computePass.end();
     // Copy the updated texture back
     commandEncoder.copyTextureToTexture(
       {
@@ -530,6 +531,6 @@ async function start() {
 
     device.queue.submit([commandEncoder.finish()]);
     camera.timestep += 1;
-    requestAnimationFrame(frame);
+    //requestAnimationFrame(frame);
   }
 }

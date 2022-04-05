@@ -47,7 +47,7 @@ fn main(
     (y / camera.resolution.y)
   );
   let col1 = getNearestColor(uv);
-  let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
-  let col3 = mix(col1, col2, 1.0 - 1.0 / camera.timestep);
-  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
+  // let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
+  // let col3 = mix(col1, col2, 1.0 - 1.0 / camera.timestep);
+  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col1);
 }

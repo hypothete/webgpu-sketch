@@ -228,14 +228,14 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
   // return vec4<f32>(f32(i/bounces), 0.0, 0.0, 1.0); // debug for bounces
 }
 
-@stage(compute) @workgroup_size(128, 1, 1)
+@stage(compute) @workgroup_size(16, 8, 1)
 fn main(
     @builtin(global_invocation_id) global_id : vec3<u32>
   ) {
-  RNGSTATE = u32(camera.timestep * f32(global_id.x));
+  RNGSTATE = u32(camera.timestep * f32(global_id.x) * f32(global_id.y));
+  let arrayPosition = global_id.x * 8u + global_id.y; // 0 - 127
   let x = randomFloat() * camera.resolution.x;
   let y = randomFloat() * camera.resolution.y;
-  let aspect = camera.resolution.y / camera.resolution.x;
   let uv = vec2<f32>(
     (x / camera.resolution.x),
     (y / camera.resolution.y)
@@ -267,7 +267,7 @@ fn main(
   }
   col1 = vec4<f32>(col1.rgb / f32(SAMPLES), 1.0);
 
-  output[global_id.x] = RayPoint(
+  output[arrayPosition] = RayPoint(
     col1,
     vec2<f32>(x,y)
   );
