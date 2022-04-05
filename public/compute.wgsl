@@ -38,13 +38,16 @@ struct Info {
   material: u32,
 }
 
+struct RayPoint {
+  color: vec4<f32>,
+  position: vec2<f32>,
+}
+
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var<storage> triangles: array<Triangle>;
 @group(0) @binding(3) var<storage> materials: array<Material>;
-@group(0) @binding(4) var mySampler : sampler;
-@group(0) @binding(5) var computeCopyTexture : texture_2d<f32>;
-@group(0) @binding(6) var outputTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var<storage, write> output: array<RayPoint>;
 
 let PI: f32 = 3.141592653589;
 let EPSILON: f32 = 0.001;
@@ -225,24 +228,20 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
   // return vec4<f32>(f32(i/bounces), 0.0, 0.0, 1.0); // debug for bounces
 }
 
-@stage(compute) @workgroup_size(16, 16, 1)
+@stage(compute) @workgroup_size(128, 1, 1)
 fn main(
-    @builtin(global_invocation_id) global_id : vec3<u32>,
-    @builtin(local_invocation_id) local_id : vec3<u32>,
+    @builtin(global_invocation_id) global_id : vec3<u32>
   ) {
-
-  let x = f32(global_id.x);
-  let y = f32(global_id.y);
-  RNGSTATE = u32(camera.timestep * x * y);
+  RNGSTATE = u32(camera.timestep * f32(global_id.x));
+  let x = randomFloat() * camera.resolution.x;
+  let y = randomFloat() * camera.resolution.y;
   let aspect = camera.resolution.y / camera.resolution.x;
   let uv = vec2<f32>(
     (x / camera.resolution.x),
     (y / camera.resolution.y)
   );
   let camPosition = camera.iViewMatrix * vec4<f32>(0.0, 0.0, 0.0, 1.0);
-
   var col1 = vec4<f32>();
-
   var i: u32 = 0u;
   loop {
     if (i >= SAMPLES) {
@@ -268,8 +267,8 @@ fn main(
   }
   col1 = vec4<f32>(col1.rgb / f32(SAMPLES), 1.0);
 
-  let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
-  let col3 = mix(col1, col2, 1.0 - 1.0 / camera.timestep);
-
-  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
+  output[global_id.x] = RayPoint(
+    col1,
+    vec2<f32>(x,y)
+  );
 }

@@ -11,6 +11,7 @@ let keys: Record<string, boolean> = {};
 let computeTexture: GPUTexture | undefined;
 let computeCopyTexture: GPUTexture | undefined;
 let camera: Camera | undefined;
+const POINTS_COUNT = 128;
 start();
 
 async function start() {
@@ -31,6 +32,9 @@ async function start() {
 
   //// LOAD RELEVANT FILES ////
   const computeWGSL = await fetch('/compute.wgsl')
+    .then(response => response.text());
+
+    const voronoiWGSL = await fetch('/voronoi.wgsl')
     .then(response => response.text());
 
   const fullscreenTexturedQuadWGSL = await fetch('/fullscreen-textured-quad.wgsl')
@@ -124,23 +128,8 @@ async function start() {
       {
         binding: 4,
         visibility: GPUShaderStage.COMPUTE,
-        sampler: {
-          type: 'filtering'
-        }
-      },
-      {
-        binding: 5,
-        visibility: GPUShaderStage.COMPUTE,
-        texture: {
-          sampleType: 'float'
-        }
-      },
-      {
-        binding: 6,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          format: 'rgba16float',
-          access: 'write-only'
+        buffer: {
+          type: 'storage'
         }
       }
     ]
@@ -155,6 +144,59 @@ async function start() {
     },
     layout: device.createPipelineLayout({
       bindGroupLayouts: [computeBindGroupLayout]
+    })
+  });
+
+  const voronoiBindGroupLayout = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'read-only-storage',
+        }
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'uniform'
+        }
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        sampler: {
+          type: 'filtering'
+        }
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        texture: {
+          sampleType: 'float'
+        }
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          format: 'rgba16float',
+          access: 'write-only'
+        }
+      }
+    ]
+  });
+
+  const voronoiPipeline = device.createComputePipeline({
+    compute: {
+      module: device.createShaderModule({
+        code: voronoiWGSL,
+      }),
+      entryPoint: "main",
+    },
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [voronoiBindGroupLayout]
     })
   });
 
@@ -209,6 +251,14 @@ async function start() {
       bindGroupLayouts: [renderBindGroupLayout]
     })
   });
+
+  //// POINT BUFFER SETUP ////
+  const pointsBuffer = device.createBuffer({
+    size: vec4Size * 2 * POINTS_COUNT,
+    usage: GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
+  });
+  pointsBuffer.unmap();
 
   //// TEXTURE SETUP ////
   const sampler = device.createSampler({
@@ -383,25 +433,53 @@ async function start() {
         },
         {
           binding: 4,
+          resource: {
+            buffer: pointsBuffer,
+          },
+        },
+      ],
+    }));
+    computePass.dispatch(POINTS_COUNT, 1, 1);
+    computePass.end();
+
+    //// VORONOI PASS ////
+    const voronoiPass = commandEncoder.beginComputePass();
+    voronoiPass.setPipeline(voronoiPipeline);
+    voronoiPass.setBindGroup(0, device.createBindGroup({
+      layout: voronoiBindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: pointsBuffer,
+          }
+        },
+        {
+          binding: 1,
+          resource: {
+            buffer: camera.buffer as GPUBuffer,
+          },
+        },
+        {
+          binding: 2,
           resource: sampler,
         },
         {
-          binding: 5,
+          binding: 3,
           resource: computeCopyTexture.createView(),
         },
         {
-          binding: 6,
+          binding: 4,
           resource: computeTexture.createView(),
         },
       ],
     }));
-    // workgroup sizes are 16x16 right now
-    computePass.dispatch(
+    voronoiPass.dispatch(
       Math.ceil(presentationSize[0] / 16),
       Math.ceil(presentationSize[1] / 16),
       1
     );
-    computePass.end();
+    voronoiPass.end();
     // Copy the updated texture back
     commandEncoder.copyTextureToTexture(
       {
@@ -413,7 +491,7 @@ async function start() {
       presentationSize,
     );
 
-    ////RENDER PASS ////
+    //// RENDER PASS ////
     const swapChainTexture = context.getCurrentTexture();
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
