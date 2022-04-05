@@ -110,16 +110,15 @@ class Camera {
         if (indices && positions) {
           const indexArray = indices.getArray();
           if (!indexArray) return;
-          // iterate over triangles, cull & add to buffer
-          for(let i = 0; i < indexArray?.length; i ++) {
+          // iterate over triangles & add to buffer
+          indexArray.forEach(index => {
             const aPosition = vec4.fromValues(
-              ...positions.getElement(indexArray[i], []) as [number, number, number],
+              ...positions.getElement(index, []) as [number, number, number],
               1
             );
-
             vec4.transformMat4(aPosition, aPosition, meshTransform);
             triRaw.push(...aPosition);
-          }
+          })
         }
       });
     });
