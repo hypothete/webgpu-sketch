@@ -99,7 +99,7 @@ class Camera {
   parseGLTFDocument(gltfDoc: Document): Float32Array {
     const nodes = gltfDoc.getRoot().listNodes();
     const triRaw: number[] = [];
-    nodes.forEach(node => {
+    nodes.forEach((node, nodeIndex) => {
       const meshTransform = node.getMatrix();
       const mesh = node.getMesh();
       if (!mesh) return;
@@ -111,14 +111,18 @@ class Camera {
           const indexArray = indices.getArray();
           if (!indexArray) return;
           // iterate over triangles & add to buffer
-          indexArray.forEach(index => {
-            const aPosition = vec4.fromValues(
-              ...positions.getElement(index, []) as [number, number, number],
-              1
-            );
+          for (let i = 0; i < indexArray.length; i+= 3) {
+            const aPosition = vec4.fromValues(...positions.getElement(indexArray[i + 0], []) as [number, number, number], 1);
+            const bPosition = vec4.fromValues(...positions.getElement(indexArray[i + 1], []) as [number, number, number], 1);
+            const cPosition = vec4.fromValues(...positions.getElement(indexArray[i + 2], []) as [number, number, number], 1);
             vec4.transformMat4(aPosition, aPosition, meshTransform);
-            triRaw.push(...aPosition);
-          })
+            vec4.transformMat4(bPosition, bPosition, meshTransform);
+            vec4.transformMat4(cPosition, cPosition, meshTransform);
+            const triangleData = [...aPosition, ...bPosition, ...cPosition];
+            // set the material
+            triangleData[11] = nodeIndex;
+            triRaw.push(...triangleData);
+          }
         }
       });
     });

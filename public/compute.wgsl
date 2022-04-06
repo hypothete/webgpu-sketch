@@ -17,6 +17,7 @@ struct Triangle {
   a: vec3<f32>,
   b: vec3<f32>,
   c: vec3<f32>,
+  material: f32;
 }
 
 struct Material {
@@ -156,7 +157,7 @@ fn intersectTriangles(r: Ray,  info: ptr<function,Info>)  {
     if (triIntersection > camera.near && triIntersection < (*info).lengths.x) {
         (*info).lengths.x = triIntersection;
         (*info).normal = triangleNormal(triangles[i]);
-        (*info).material = 1u; // todo assign materials to meshes
+        (*info).material = u32(triangles[i].material);
     }
     i = i + 1u;
   }
