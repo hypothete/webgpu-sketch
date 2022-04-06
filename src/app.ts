@@ -1,4 +1,4 @@
-import { vec3, vec4, mat4 } from 'gl-matrix';
+import { vec3, mat4 } from 'gl-matrix';
 import { WebIO } from '@gltf-transform/core';
 
 import Camera from './camera';
@@ -11,7 +11,7 @@ let keys: Record<string, boolean> = {};
 let computeTexture: GPUTexture | undefined;
 let computeCopyTexture: GPUTexture | undefined;
 let camera: Camera | undefined;
-const POINTS_COUNT = 128;
+const POINTS_COUNT = 2048;
 start();
 
 async function start() {
@@ -441,7 +441,7 @@ async function start() {
         },
       ],
     }));
-    computePass.dispatch(1, 1, 1);
+    computePass.dispatch(POINTS_COUNT, 1, 1);
 
     //// VORONOI PASS ////
 
@@ -531,6 +531,6 @@ async function start() {
 
     device.queue.submit([commandEncoder.finish()]);
     camera.timestep += 1;
-    //requestAnimationFrame(frame);
+    requestAnimationFrame(frame);
   }
 }

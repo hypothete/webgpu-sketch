@@ -27,11 +27,12 @@ fn getNearestColor (uv: vec2<f32>) -> vec4<f32> {
     if (i >= numPoints) {
       break;
     }
-    let ptDist = distance(points[i].position, uv);
+    let ptDist = distance(points[i].position / camera.resolution, uv);
     if (ptDist < minDist) {
       minDist = ptDist;
       closestColor = points[i].color;
     }
+    i = i + 1u;
   }
   return closestColor;
 }
@@ -47,7 +48,7 @@ fn main(
     (y / camera.resolution.y)
   );
   let col1 = getNearestColor(uv);
-  // let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
-  // let col3 = mix(col1, col2, 1.0 - 1.0 / camera.timestep);
-  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col1);
+  let col2 = textureSampleLevel(computeCopyTexture, mySampler, uv, 0.0);
+  let col3 = mix(col1, col2, 1.0 - 1.0 / camera.timestep);
+  textureStore(outputTex, vec2<i32>(i32(x),i32(y)), col3);
 }
