@@ -17,7 +17,13 @@ struct Triangle {
   a: vec3<f32>,
   b: vec3<f32>,
   c: vec3<f32>,
-  material: f32;
+  mesh: f32,
+}
+
+struct Mesh {
+  aa: vec3<f32>,
+  bb: vec3<f32>,
+  material: f32,
 }
 
 struct Material {
@@ -43,16 +49,17 @@ struct Info {
 @group(0) @binding(1) var<storage> spheres: array<Sphere>;
 @group(0) @binding(2) var<storage> triangles: array<Triangle>;
 @group(0) @binding(3) var<storage> materials: array<Material>;
-@group(0) @binding(4) var mySampler : sampler;
-@group(0) @binding(5) var computeCopyTexture : texture_2d<f32>;
-@group(0) @binding(6) var outputTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var<storage> meshes: array<Mesh>;
+@group(0) @binding(5) var mySampler : sampler;
+@group(0) @binding(6) var computeCopyTexture : texture_2d<f32>;
+@group(0) @binding(7) var outputTex: texture_storage_2d<rgba16float, write>;
 
 let PI: f32 = 3.141592653589;
 let EPSILON: f32 = 0.001;
 let RAY_BOUNCES: u32 = 4u;
 let SAMPLES: u32 = 1u;
 let SKY_COLOR: vec3<f32> = vec3<f32>(0.6, 0.65, 0.8);
-
+let MESH_CAP: u32 = 10u; // todo can this be set procedurally?
 var<private> RNGSTATE: u32 = 42u;
 
 fn pcgHash() -> u32 {
@@ -113,6 +120,23 @@ fn intersectTriangle(r: Ray, t: Triangle) -> f32 {
   return -1.0;
 }
 
+fn minComponent (v: vec3<f32>) -> f32 {
+  return min(min(v.x, v.y), v.z);
+}
+
+fn maxComponent (v: vec3<f32>) -> f32 {
+  return max(max(v.x, v.y), v.z);
+}
+
+fn intersectMesh(r: Ray, m: Mesh) -> bool {
+  let invDir = 1.0 / r.direction;
+  let t0 = (m.aa - r.origin) * invDir;
+  let t1 = (m.bb - r.origin) * invDir;
+  let tmin = min(t0, t1);
+  let tmax = max(t0, t1);
+  return maxComponent(tmin) <= minComponent(tmax);
+}
+
 fn rayAt(r: Ray, t: f32) -> vec3<f32> {
   return r.origin + r.direction * t;
 }
@@ -141,23 +165,40 @@ fn intersectSpheres(r: Ray,  info: ptr<function,Info>)  {
       sphereIntersections.x < (*info).lengths.x) {
         (*info).lengths.x = sphereIntersections.x;
         (*info).normal = sphereNormal(spheres[i], rayAt(r, sphereIntersections.x));
-        (*info).material = u32(spheres[i].material); // todo why can't it assign properly?
+        (*info).material = u32(spheres[i].material);
     }
     i = i + 1u;
   }
 }
 
-fn intersectTriangles(r: Ray,  info: ptr<function,Info>)  {
+fn intersectMeshes(r: Ray, info: ptr<function,Info>) {
   var i: u32 = 0u;
+  var foundMeshes: array<bool, MESH_CAP>;
+  loop {
+    if (i >= arrayLength(&meshes)) {
+      break;
+    }
+    let intersectsMesh = intersectMesh(r, meshes[i]);
+    if (intersectsMesh) {
+      foundMeshes[i] = true;
+    }
+    i = i + 1u;
+  }
+
+  i = 0u;
   loop {
     if (i >= arrayLength(&triangles)) {
       break;
     }
-    let triIntersection = intersectTriangle(r, triangles[i]);
-    if (triIntersection > camera.near && triIntersection < (*info).lengths.x) {
+    // test if valid mesh
+    let meshIndex = u32(triangles[i].mesh);
+    if (foundMeshes[meshIndex]) {
+      let triIntersection = intersectTriangle(r, triangles[i]);
+      if (triIntersection > camera.near && triIntersection < (*info).lengths.x) {
         (*info).lengths.x = triIntersection;
         (*info).normal = triangleNormal(triangles[i]);
-        (*info).material = u32(triangles[i].material);
+        (*info).material = u32(meshes[meshIndex].material);
+      }
     }
     i = i + 1u;
   }
@@ -199,7 +240,7 @@ fn raytrace(r: ptr<function,Ray>) -> vec4<f32> {
       0u
     );
     intersectSpheres(*r, &info);
-    intersectTriangles(*r, &info);
+    intersectMeshes(*r, &info);
     if (info.lengths.x >= camera.far) {
       col = col + SKY_COLOR * throughput;
       break;

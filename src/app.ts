@@ -4,7 +4,7 @@ import { WebIO } from '@gltf-transform/core';
 import Camera from './camera';
 import Material, { materials } from './materials';
 import Sphere, { spheres } from './spheres';
-import { vec4Size } from './generic';
+import { vec4Size, parseGLTFDocument } from './generic';
 
 //// CONSTANTS AND INIT ////
 let keys: Record<string, boolean> = {};
@@ -124,19 +124,26 @@ async function start() {
       {
         binding: 4,
         visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: 'read-only-storage'
+        }
+      },
+      {
+        binding: 5,
+        visibility: GPUShaderStage.COMPUTE,
         sampler: {
           type: 'filtering'
         }
       },
       {
-        binding: 5,
+        binding: 6,
         visibility: GPUShaderStage.COMPUTE,
         texture: {
           sampleType: 'float'
         }
       },
       {
-        binding: 6,
+        binding: 7,
         visibility: GPUShaderStage.COMPUTE,
         storageTexture: {
           format: 'rgba16float',
@@ -250,17 +257,25 @@ async function start() {
   sphereArray.set(sphereData);
   sphereBuffer.unmap();
 
-  //// VERTEX ARRAY ////
-  const triData = camera.parseGLTFDocument(gltfDoc);
+  //// VERTEX AND MESH ARRAYS ////
+  const { triangleData, meshData } = parseGLTFDocument(gltfDoc);
   const triBuffer = device.createBuffer({
-    size: triData.byteLength,
+    size: triangleData.byteLength,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
     mappedAtCreation: true
   });
   const triArray = new Float32Array(triBuffer.getMappedRange());
-  triArray.set(triData);
+  triArray.set(triangleData);
   triBuffer.unmap();
-  camera.updateBuffer(device);
+
+  const meshBuffer = device.createBuffer({
+    size: meshData.byteLength,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
+    mappedAtCreation: true
+  });
+  const meshArray = new Float32Array(meshBuffer.getMappedRange());
+  meshArray.set(meshData);
+  meshBuffer.unmap();
 
   //// MATERIAL ARRAY ////
   const materialData = materials.flatMap(material => material.toArray());
@@ -383,14 +398,20 @@ async function start() {
         },
         {
           binding: 4,
-          resource: sampler,
+          resource: {
+            buffer: meshBuffer,
+          }
         },
         {
           binding: 5,
-          resource: computeCopyTexture.createView(),
+          resource: sampler,
         },
         {
           binding: 6,
+          resource: computeCopyTexture.createView(),
+        },
+        {
+          binding: 7,
           resource: computeTexture.createView(),
         },
       ],

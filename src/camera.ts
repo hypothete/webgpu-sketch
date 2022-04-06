@@ -1,5 +1,4 @@
-import { mat4, vec3, vec4 } from 'gl-matrix';
-import { Document } from '@gltf-transform/core';
+import { mat4, vec3 } from 'gl-matrix';
 
 import { vec4Size } from './generic';
 
@@ -96,39 +95,6 @@ class Camera {
     device.queue.writeBuffer(this.buffer as GPUBuffer, vec4Size * 9, tsBuffer);
   }
 
-  parseGLTFDocument(gltfDoc: Document): Float32Array {
-    const nodes = gltfDoc.getRoot().listNodes();
-    const triRaw: number[] = [];
-    nodes.forEach((node, nodeIndex) => {
-      const meshTransform = node.getMatrix();
-      const mesh = node.getMesh();
-      if (!mesh) return;
-      const primitives = mesh.listPrimitives();
-      primitives.forEach(primitive => {
-        const indices = primitive.getIndices();
-        const positions = primitive.getAttribute('POSITION');
-        if (indices && positions) {
-          const indexArray = indices.getArray();
-          if (!indexArray) return;
-          // iterate over triangles & add to buffer
-          for (let i = 0; i < indexArray.length; i+= 3) {
-            const aPosition = vec4.fromValues(...positions.getElement(indexArray[i + 0], []) as [number, number, number], 1);
-            const bPosition = vec4.fromValues(...positions.getElement(indexArray[i + 1], []) as [number, number, number], 1);
-            const cPosition = vec4.fromValues(...positions.getElement(indexArray[i + 2], []) as [number, number, number], 1);
-            vec4.transformMat4(aPosition, aPosition, meshTransform);
-            vec4.transformMat4(bPosition, bPosition, meshTransform);
-            vec4.transformMat4(cPosition, cPosition, meshTransform);
-            const triangleData = [...aPosition, ...bPosition, ...cPosition];
-            // set the material
-            triangleData[11] = nodeIndex;
-            triRaw.push(...triangleData);
-          }
-        }
-      });
-    });
-
-    return Float32Array.from(triRaw);
-  }
 }
 
 export default Camera;
