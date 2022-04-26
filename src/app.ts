@@ -35,10 +35,10 @@ async function start() {
   }
 
   //// LOAD RELEVANT FILES ////
-  const computeWGSL = await fetch('/compute.wgsl')
+  const computeWGSL = await fetch('./compute.wgsl')
     .then(response => response.text());
 
-  const fullscreenTexturedQuadWGSL = await fetch('/fullscreen-textured-quad.wgsl')
+  const fullscreenTexturedQuadWGSL = await fetch('./fullscreen-textured-quad.wgsl')
     .then(response => response.text());
   
   const io = new WebIO({credentials: 'include'});
